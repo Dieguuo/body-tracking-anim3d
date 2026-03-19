@@ -47,22 +47,29 @@ document.addEventListener('videoListo', async (evento) => {
 
 function animarResultados(datos) {
     const panelResultados = document.getElementById('panel-resultados');
-    const displayDistancia = document.getElementById('distancia-resultado');
-    const displayTipo = document.getElementById('tipo-resultado');
-    const displayConfianza = document.getElementById('confianza-resultado');
-
-    // Inyectar los valores del JSON en el HTML
-    displayDistancia.textContent = `${datos.distancia} ${datos.unidad || 'cm'}`;
-    displayTipo.textContent = `Análisis de salto ${datos.tipo_salto} completado.`;
     
-    // Convertir el decimal (ej. 0.98) a porcentaje (98%)
+    // Inyectar datos principales
+    document.getElementById('distancia-resultado').textContent = `${datos.distancia} ${datos.unidad || 'cm'}`;
+    document.getElementById('tipo-resultado').textContent = `Salto ${datos.tipo_salto} analizado`;
+    
+    // Inyectar cuadrícula de datos técnicos
     const porcentaje = Math.round(datos.confianza * 100);
-    displayConfianza.textContent = `Precisión de lectura: ${porcentaje}%`;
+    document.getElementById('data-confianza').textContent = `${porcentaje}%`;
+    document.getElementById('data-tiempo').textContent = datos.tiempo_vuelo_s ? `${datos.tiempo_vuelo_s}s` : '--';
+    document.getElementById('data-despegue').textContent = datos.frame_despegue || '--';
+    document.getElementById('data-aterrizaje').textContent = datos.frame_aterrizaje || '--';
 
-    // Activar la animación CSS subiendo el panel desde abajo
+    // Desplegar el panel subiendo desde abajo
     panelResultados.classList.add('show');
     reiniciarBotonGrabar();
 }
+
+// Lógica para el NUEVO botón grande de "Nuevo Salto"
+document.getElementById('btn-reintentar').addEventListener('click', () => {
+    const panelResultados = document.getElementById('panel-resultados');
+    // Baja el panel para mostrar la cámara otra vez
+    panelResultados.classList.remove('show');
+});
 
 function reiniciarBotonGrabar() {
     const btnGrabar = document.getElementById('btn-grabar');
