@@ -21,8 +21,11 @@ document.addEventListener('videoListo', async (evento) => {
     formData.append('altura_real_m', alturaUsuario);
 
     try {
-        // 4. Enviar petición al servidor local (puerto 5001)
-        const respuesta = await fetch('http://localhost:5001/api/salto/calcular', {
+        // 4. Detectar la IP de la red automáticamente y enviar petición
+        const ipServidor = window.location.hostname;
+        const urlBackend = `http://${ipServidor}:5001/api/salto/calcular`;
+        
+        const respuesta = await fetch(urlBackend, {
             method: 'POST',
             body: formData
         });
@@ -37,7 +40,7 @@ document.addEventListener('videoListo', async (evento) => {
 
     } catch (error) {
         console.error('Fallo en la comunicación:', error);
-        alert('Error al conectar con el servidor de análisis. Asegúrate de que el backend en Python está en ejecución.');
+        alert(`Error al conectar con ${window.location.hostname}:5001. Comprueba que app.py está arrancado.`);
         reiniciarBotonGrabar();
     }
 });

@@ -3,20 +3,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnGrabar = document.getElementById('btn-grabar');
     const btnText = document.getElementById('btn-text');
     
+    // Elementos del botón de subida
+    //const inputArchivo = document.getElementById('input-archivo');
+    const btnUploadText = document.querySelector('.upload-btn');
+    
     let mediaRecorder;
     let fragmentosVideo = [];
     let estaGrabando = false;
 
-    // 1. Solicitar acceso a la cámara trasera
+    // --- 1. LÓGICA DE LA CÁMARA ---
     async function iniciarCamara() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { 
-                    facingMode: 'environment', // Fuerza la cámara trasera en móviles
+                    facingMode: 'environment',
                     width: { ideal: 1280 },
                     height: { ideal: 720 }
                 },
-                audio: false // El audio no es necesario para el cálculo
+                audio: false
             });
             
             videoElement.srcObject = stream;
@@ -24,19 +28,16 @@ document.addEventListener('DOMContentLoaded', () => {
             
         } catch (error) {
             console.error('Error al acceder a la cámara:', error);
-            alert('Es necesario dar permisos de cámara para medir el salto.');
+            alert('Es necesario dar permisos de cámara para medir el salto. Si estás en red local, usa HTTPS o configura las flags de Chrome.');
         }
     }
 
-    // 2. Configurar el motor de grabación
     function prepararGrabacion(stream) {
-        // Usar formato compatible con la mayoría de navegadores móviles
         const opciones = { mimeType: 'video/webm;codecs=vp8' };
         
         try {
             mediaRecorder = new MediaRecorder(stream, opciones);
         } catch (e) {
-            // Fallback para iOS Safari que requiere mp4
             mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/mp4' });
         }
 
@@ -47,36 +48,65 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         mediaRecorder.onstop = () => {
-            // Cuando se detiene, se empaqueta el vídeo en un archivo
             const blobVideo = new Blob(fragmentosVideo, { type: mediaRecorder.mimeType });
-            fragmentosVideo = []; // Limpiar para el siguiente salto
+            fragmentosVideo = []; 
             
-            // Disparar un evento personalizado para que api_salto.js lo capture
             const eventoVideoListo = new CustomEvent('videoListo', { detail: blobVideo });
             document.dispatchEvent(eventoVideoListo);
         };
     }
 
-    // 3. Control del botón de grabación
+    // --- 2. CONTROL DEL BOTÓN DE GRABAR ---
     btnGrabar.addEventListener('click', () => {
-        if (!mediaRecorder) return;
+        if (!mediaRecorder) {
+            alert('La cámara no está lista. Revisa los permisos.');
+            return;
+        }
 
         if (!estaGrabando) {
-            // Empezar a grabar
             mediaRecorder.start();
             estaGrabando = true;
             btnGrabar.classList.add('recording');
             btnText.textContent = 'Detener';
         } else {
-            // Parar la grabación
             mediaRecorder.stop();
             estaGrabando = false;
             btnGrabar.classList.remove('recording');
             btnText.textContent = 'Procesando...';
-            btnGrabar.disabled = true; // Evitar multiples clics mientras procesa
+            btnGrabar.disabled = true;
         }
     });
 
-    // Arrancar la cámara al cargar la página
+    // --- 3. LÓGICA DEL BOTÓN DE SUBIR ARCHIVO ---
+// --- 3. LÓGICA DE SUBIDA DE ARCHIVO (OPACIDAD CERO) ---
+    const inputTecnico = document.getElementById('input-archivo-final');
+    const labelVisual = document.getElementById('label-visual');
+
+    if (inputTecnico) {
+        // Escuchar directamente cuando el usuario selecciona el archivo
+        inputTecnico.addEventListener('change', (evento) => {
+            const archivo = evento.target.files[0];
+            
+            if (archivo) {
+                // Cambiar el texto del div estético que está debajo
+                const textoOriginal = labelVisual.textContent;
+                labelVisual.textContent = 'Enviando...';
+                labelVisual.style.background = 'rgba(255, 255, 255, 0.3)';
+                
+                // Disparar el evento para que api_salto.js procese el vídeo
+                const eventoVideoListo = new CustomEvent('videoListo', { detail: archivo });
+                document.dispatchEvent(eventoVideoListo);
+
+                // Restaurar estética
+                setTimeout(() => {
+                    labelVisual.textContent = textoOriginal;
+                    labelVisual.style.background = 'rgba(255, 255, 255, 0.1)';
+                    inputTecnico.value = ''; // Reset para futuros archivos
+                }, 2000);
+            }
+        });
+    }
+
+    // --- 4. INICIO AUTOMÁTICO ---
     iniciarCamara();
 });
