@@ -41,15 +41,18 @@ class DistanciaController:
 
     def _bucle_lectura(self):
         """Hilo daemon: lee continuamente del serial y actualiza la última medición."""
-        while True:
-            try:
-                medicion = self._sensor.leer_linea()
-                if medicion:
-                    with self._lock:
-                        self._ultima_medicion = medicion
-            except (serial.SerialException, OSError):
-                self.view.mostrar_error("Conexión serial perdida.")
-                break
+        try:
+            while True:
+                try:
+                    medicion = self._sensor.leer_linea()
+                    if medicion:
+                        with self._lock:
+                            self._ultima_medicion = medicion
+                except (serial.SerialException, OSError):
+                    self.view.mostrar_error("Conexión serial perdida.")
+                    break
+        finally:
+            self._sensor.desconectar()
 
     def iniciar_en_segundo_plano(self) -> bool:
         """

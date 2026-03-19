@@ -158,7 +158,6 @@ class CalculoService:
             )
 
         desplazamiento_px = abs(x_aterrizaje - x_despegue)
-        print(f"DEBUG - X Despegue: {x_despegue}, X Aterrizaje: {x_aterrizaje}, DesplazPx: {desplazamiento_px}")
 
         # D_real = Dp * S  →  en metros, convertir a cm
         distancia_m = desplazamiento_px * factor_escala

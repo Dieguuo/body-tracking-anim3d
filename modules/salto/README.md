@@ -88,7 +88,7 @@ Flask app.py          (API)         — POST /api/salto/calcular → JSON
 
 ### Salto vertical — Método híbrido (cinemática + píxeles calibrados)
 
-Se detecta el despegue y aterrizaje mediante la **derivada de la coordenada Y del talón** (cambio brusco = transición suelo/aire).
+Se detecta el despegue y aterrizaje mediante la **derivada de la coordenada Y del talón** (cambio brusco = transición suelo/aire). La señal se suaviza previamente con **media móvil de 3 frames** y se aplica un **margen ciego de 5 frames** tras el despegue para evitar falsos aterrizajes.
 
 Se combinan dos métodos independientes:
 
@@ -121,6 +121,10 @@ D_real = Dp × S      (distancia real en metros)
 ```
 
 Donde `Hr` = altura real (m), `Hp` = altura en píxeles, `Dp` = desplazamiento horizontal en píxeles.
+
+## Filtrado de reflejos
+
+MediaPipe se configura con `num_poses=2` para detectar hasta dos personas. Si hay una segunda detección (reflejo en una superficie cercana), se selecciona la **silueta más grande** (mayor distancia cabeza-pies en píxeles), descartando automáticamente el reflejo.
 
 ## Estado — Fase 2
 

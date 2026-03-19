@@ -27,7 +27,9 @@ from config import (
 )
 
 # Ruta al modelo descargado (junto a este archivo)
-_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "pose_landmarker_lite.task")
+_MODEL_PATH = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "pose_landmarker_lite.task")
+)
 
 
 @dataclass
@@ -61,9 +63,14 @@ class VideoProcessor:
     """
     MODEL — Procesa un archivo de vídeo y extrae las coordenadas de los pies
     fotograma a fotograma mediante MediaPipe PoseLandmarker.
+
+    Se crea un nuevo PoseLandmarker por cada llamada a procesar() para
+    garantizar timestamps monotónicos y evitar problemas de concurrencia.
     """
 
-    def __init__(self):
+    @staticmethod
+    def _crear_landmarker():
+        """Crea una instancia fresca de PoseLandmarker."""
         options = PoseLandmarkerOptions(
             base_options=BaseOptions(model_asset_path=_MODEL_PATH),
             running_mode=RunningMode.VIDEO,
@@ -71,56 +78,53 @@ class VideoProcessor:
             min_pose_detection_confidence=MIN_DETECTION_CONFIDENCE,
             min_tracking_confidence=MIN_TRACKING_CONFIDENCE,
         )
-        self._landmarker = PoseLandmarker.create_from_options(options)
-
-    def obtener_info(self, ruta_video: str) -> InfoVideo | None:
-        """Devuelve los metadatos del vídeo, o None si no se puede abrir."""
-        cap = cv2.VideoCapture(ruta_video)
-        if not cap.isOpened():
-            return None
-        info = InfoVideo(
-            fps=cap.get(cv2.CAP_PROP_FPS),
-            total_frames=int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
-            ancho=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            alto=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-        )
-        cap.release()
-        return info
+        return PoseLandmarker.create_from_options(options)
 
     def procesar(self, ruta_video: str) -> tuple[list[FramePies], InfoVideo | None]:
         """
         Procesa el vídeo completo y devuelve:
           - Lista de FramePies con las coordenadas de pies por frame.
           - InfoVideo con metadatos.
+
+        Crea un PoseLandmarker nuevo por cada vídeo para garantizar
+        timestamps monotónicos y thread safety.
         """
         cap = cv2.VideoCapture(ruta_video)
         if not cap.isOpened():
             return [], None
 
         fps = cap.get(cv2.CAP_PROP_FPS)
+        if fps <= 0:
+            cap.release()
+            return [], None
+
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         ancho = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         alto = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         info = InfoVideo(fps=fps, total_frames=total, ancho=ancho, alto=alto)
 
+        landmarker = self._crear_landmarker()
         frames: list[FramePies] = []
         idx = 0
 
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
+        try:
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
 
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
-            timestamp_ms = int((idx / fps) * 1000) if fps > 0 else idx
-            resultado = self._landmarker.detect_for_video(mp_image, timestamp_ms)
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
+                timestamp_ms = int((idx / fps) * 1000)
+                resultado = landmarker.detect_for_video(mp_image, timestamp_ms)
 
-            fp = self._extraer_pies(resultado, idx, fps, alto, ancho)
-            frames.append(fp)
-            idx += 1
+                fp = self._extraer_pies(resultado, idx, fps, alto, ancho)
+                frames.append(fp)
+                idx += 1
+        finally:
+            landmarker.close()
+            cap.release()
 
-        cap.release()
         return frames, info
 
     def _extraer_pies(self, resultado, idx: int, fps: float, alto: int, ancho: int) -> FramePies:
@@ -148,6 +152,14 @@ class VideoProcessor:
                 max_altura = altura_actual
                 mejor_lm = pose
 
+        if mejor_lm is None:
+            return FramePies(
+                frame_idx=idx, timestamp_s=idx / fps if fps > 0 else 0,
+                talon_izq_y=None, talon_der_y=None, punta_izq_y=None, punta_der_y=None,
+                talon_izq_x=None, talon_der_x=None, punta_izq_x=None, punta_der_x=None,
+                altura_persona_px=None,
+            )
+
         lm = mejor_lm
         altura_px = max_altura
 
@@ -171,6 +183,4 @@ class VideoProcessor:
             altura_persona_px=altura_px if altura_px > 0 else None,
         )
 
-    def cerrar(self):
-        """Libera recursos de MediaPipe."""
-        self._landmarker.close()
+

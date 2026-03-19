@@ -11,17 +11,19 @@ Endpoints:
     POST /api/salto/calcular  → JSON con el resultado del salto
 """
 
+import logging
 import os
 import uuid
 
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
-from config import FLASK_PORT, UPLOAD_FOLDER, EXTENSIONES_PERMITIDAS
+from config import FLASK_PORT, UPLOAD_FOLDER, EXTENSIONES_PERMITIDAS, MAX_UPLOAD_MB
 from controllers.salto_controller import SaltoController
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 CORS(app)
 
 controller = SaltoController()
@@ -30,10 +32,12 @@ controller = SaltoController()
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-@app.route("/")
-def index():
-    """Sirve la página de prueba (temporal)."""
-    return send_file("test_frontend.html")
+@app.errorhandler(413)
+def archivo_demasiado_grande(e):
+    """Devuelve JSON en vez de HTML cuando el archivo excede el límite."""
+    return jsonify({
+        "error": f"El archivo excede el límite de {MAX_UPLOAD_MB} MB"
+    }), 413
 
 
 @app.route("/api/salto/calcular", methods=["POST"])
@@ -44,7 +48,7 @@ def calcular_salto():
     Form-data esperado:
         - video: archivo .mp4 / .webm / .avi / .mov
         - tipo_salto: "vertical" | "horizontal"
-        - altura_real_m: float (obligatorio si tipo_salto == "horizontal")
+        - altura_real_m: float (obligatorio para ambos tipos)
     """
     # Validar que viene el archivo de vídeo
     if "video" not in request.files:
@@ -102,6 +106,11 @@ def calcular_salto():
             "dist_por_pixeles": resultado.dist_por_pixeles,
             "dist_por_cinematica": resultado.dist_por_cinematica,
         })
+    except Exception:
+        logging.exception("Error procesando vídeo %s", nombre_archivo)
+        return jsonify({
+            "error": "Error interno al procesar el vídeo. Verifica que el archivo sea válido."
+        }), 500
     finally:
         # Limpiar archivo temporal
         if os.path.exists(ruta_video):

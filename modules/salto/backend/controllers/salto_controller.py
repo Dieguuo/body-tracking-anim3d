@@ -5,9 +5,6 @@ Recibe la ruta del vídeo y los parámetros, coordina modelo y servicio,
 y devuelve el resultado final.
 """
 
-import os
-
-from config import EXTENSIONES_PERMITIDAS
 from models.video_processor import VideoProcessor
 from services.calculo_service import CalculoService, ResultadoSalto
 
@@ -37,32 +34,15 @@ class SaltoController:
         Args:
             ruta_video: Ruta al archivo de vídeo guardado en disco.
             tipo_salto: "vertical" o "horizontal".
-            altura_real_m: Altura real del usuario en metros (obligatorio para horizontal).
+            altura_real_m: Altura real del usuario en metros (obligatorio para ambos tipos).
 
         Returns:
             ResultadoSalto con la distancia calculada.
         """
-        # Validar extensión
-        ext = os.path.splitext(ruta_video)[1].lower()
-        if ext not in EXTENSIONES_PERMITIDAS:
-            return ResultadoSalto(
-                tipo_salto=tipo_salto,
-                distancia=0.0,
-                confianza=0.0,
-            )
-
         # Procesar vídeo (Model)
         frames, info = self.processor.procesar(ruta_video)
 
         if not frames or info is None:
-            return ResultadoSalto(
-                tipo_salto=tipo_salto,
-                distancia=0.0,
-                confianza=0.0,
-            )
-
-        # Calcular (Service)
-        if altura_real_m is None or altura_real_m <= 0:
             return ResultadoSalto(
                 tipo_salto=tipo_salto,
                 distancia=0.0,
@@ -74,6 +54,4 @@ class SaltoController:
 
         return self.calculo.calcular_vertical(frames, info.fps, altura_real_m)
 
-    def cerrar(self):
-        """Libera recursos."""
-        self.processor.cerrar()
+
