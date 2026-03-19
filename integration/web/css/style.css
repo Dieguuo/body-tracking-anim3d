@@ -1,0 +1,105 @@
+/* Variables de color y ajustes base para móviles */
+:root {
+    --purple-dark: #2a0845;
+    --purple-light: #6441A5;
+    --text-light: #ffffff;
+    --text-muted: #e0e0e0;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent; /* Evita destellos azules en móviles */
+}
+
+body {
+    background: linear-gradient(135deg, var(--purple-dark), var(--purple-light));
+    color: var(--text-light);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+}
+
+/* Cabecera (Descripción del proyecto) */
+.hero {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    max-width: 600px;
+    margin-bottom: 2rem;
+}
+
+.hero h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(to right, #fff, #d4b3ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.hero p {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+/* Contenedor de las tarjetas */
+.modules-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: 100%;
+    max-width: 500px;
+    padding: 0 1.5rem 4rem 1.5rem;
+}
+
+/* Diseño de los botones tipo tarjeta */
+.module-card {
+    display: block;
+    text-decoration: none;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 2rem;
+    color: var(--text-light);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.module-card:active {
+    transform: scale(0.96); /* Efecto de pulsación fluido en móvil */
+}
+
+.card-content h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.card-content p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+/* --- CLASES PARA LA ANIMACIÓN DE SCROLL --- */
+
+/* Estado inicial: desplazado hacia abajo y transparente */
+.hidden {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Estado final: posición original y opaco */
+.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Retraso para que la segunda tarjeta aparezca después de la primera */
+#card-arduino {
+    transition-delay: 0.15s;
+}
