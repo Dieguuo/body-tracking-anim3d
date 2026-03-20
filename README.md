@@ -18,9 +18,9 @@ Documentación detallada en [`docs/`](docs/).
 
 | Módulo | Estado | Descripción |
 |--------|--------|-------------|
-| **Módulo 1 — Sensor Arduino** | ✅ Fase 1 completada | Mide distancia con HC-SR04, expone los datos via API REST |
-| **Módulo 2 — Salto con móvil** | 🚧 Fase 2 en progreso | Analiza vídeo con MediaPipe, calcula salto vertical/horizontal |
-| **Integración final** | 🔒 Fase 3 reservada | Dashboard web unificado que consume todos los módulos |
+| **Módulo 1 — Sensor Arduino** | ✅ Completado | Mide distancia con HC-SR04, expone los datos via API REST |
+| **Módulo 2 — Salto con móvil** | ✅ Backend completado | Analiza vídeo con MediaPipe, calcula salto vertical/horizontal |
+| **Integración web** | ✅ Completada | Frontend web unificado (landing + salto + sensor) |
 
 ---
 
@@ -36,56 +36,57 @@ proyecto-medicion/
 │   ├── arquitectura.md          ← Diagrama de capas y tecnologías
 │   ├── flujo_datos.md           ← Paso a paso del dato desde el dispositivo al navegador
 │   ├── fases_proyecto.md        ← Estado de cada fase
-│   └── decisiones_tecnicas.md  ← Justificaciones de diseño
+│   └── decisiones_tecnicas.md   ← Justificaciones de diseño
 │
 ├── modules/
-│   ├── sensor/                  ← Módulo 1 (Fase 1, activo)
+│   ├── sensor/                  ← Módulo 1 (completado)
 │   │   ├── README.md
 │   │   ├── arduino/
 │   │   │   └── sensor_distancia/
 │   │   │       ├── sensor_distancia.ino
 │   │   │       └── README.md
-│   │   ├── backend/             ← Python MVC + Flask API
-│   │   │   ├── app.py           ← Entry point web (GET /distancia)
-│   │   │   ├── main.py          ← Entry point consola (sin web)
-│   │   │   ├── config.py        ← Constantes centralizadas
-│   │   │   ├── controllers/
-│   │   │   ├── models/
-│   │   │   ├── views/
-│   │   │   ├── services/        # Reservado
-│   │   │   └── utils/           # Reservado
-│   │   └── frontend/            ← Interfaz web del módulo sensor
-│   │       ├── index.html
-│   │       ├── js/app.js
-│   │       └── css/styles.css
+│   │   └── backend/             ← Python MVC + Flask API (GET /distancia)
+│   │       ├── app.py
+│   │       ├── main.py          ← Entry point consola (sin web)
+│   │       ├── config.py
+│   │       ├── controllers/
+│   │       ├── models/
+│   │       └── views/
 │   │
-│   └── salto/                   ← Módulo 2 (Fase 2, backend activo)
+│   └── salto/                   ← Módulo 2 (backend completado)
 │       ├── README.md
 │       ├── backend/             ← Python MVC + Flask API + MediaPipe
 │       │   ├── app.py           ← Entry point web (POST /api/salto/calcular)
-│       │   ├── config.py        ← Constantes centralizadas
-│       │   ├── pose_landmarker_lite.task  ← Modelo MediaPipe
+│       │   ├── config.py
+│       │   ├── pose_landmarker_lite.task
 │       │   ├── controllers/
 │       │   ├── models/
-│       │   ├── services/
-│       │   └── utils/           # Reservado
+│       │   └── services/
 │       └── mobile/              # Reservado — cliente móvil
 │
-├── integration/                 ← Fase 3: dashboard web unificado (reservado)
+├── integration/
 │   ├── README.md
-│   ├── backend/                 # Reservado — orquestador/gateway si se necesita
-│   └── frontend/                # Reservado — SPA o dashboard que une todos los módulos
+│   ├── backend/                 # Reservado — gateway/orquestador
+│   └── web/                     ← Frontend web unificado
+│       ├── index.html           ← Landing con cards de módulos
+│       ├── salto.html           ← Grabación + análisis de salto
+│       ├── arduino.html         ← Lectura sensor en tiempo real
+│       ├── css/style.css
+│       └── js/
+│           ├── app.js           ← Animaciones del landing
+│           ├── camara.js        ← Grabación vídeo / subida archivo
+│           ├── api_salto.js     ← Envío a API salto + resultados
+│           └── api_sensor.js    ← Polling a API sensor
 │
 ├── scripts/
-│   ├── run_backend.bat / .sh    ← Arranca la API Flask del módulo sensor
-│   └── run_frontend.bat / .sh   ← Sirve el frontend del módulo sensor
+│   └── run_all.bat              ← Arranca todo con un doble-clic
 │
-└── tests/                       ← Reservado — pruebas unitarias e integración
+└── tests/                       # Reservado
 ```
 
 ---
 
-## Cómo ejecutar (Módulo sensor — Fase 1)
+## Cómo ejecutar
 
 ### Prerrequisitos
 
@@ -95,86 +96,33 @@ proyecto-medicion/
 pip install -r requirements.txt
 ```
 
-### 1. Backend — API Flask
+### Arranque rápido (todo a la vez)
 
-```powershell
-# Opción A — script automático (Windows)
-scripts\run_backend.bat
+Doble clic en `scripts\run_all.bat` → abre `http://localhost:8080`.
 
-# Opción B — manual
-cd modules\sensor\backend
-python app.py
-```
+### Arranque manual
 
-Endpoint disponible en `http://localhost:5000/distancia`:
-
-```json
-{
-  "valor": 23.45,
-  "unidad": "cm",
-  "raw": "Distancia: 23.45 cm",
-  "timestamp": "2026-03-18T10:30:00.123456+00:00"
-}
-```
-
-Si el Arduino aún no ha enviado datos:
-
-```json
-{ "error": "Sin datos disponibles aún" }   ← HTTP 503
-```
-
-### 2. Frontend — Interfaz web del sensor
-
-```powershell
-# Opción A — script automático (Windows)
-scripts\run_frontend.bat
-
-# Opción B — manual
-cd modules\sensor\frontend
-python -m http.server 8080
-```
-
-Abre `http://localhost:8080` en el navegador.
-
----
-
-## Cómo ejecutar (Módulo salto — Fase 2)
-
-### Backend — API Flask + MediaPipe
-
+**Backend salto (puerto 5001):**
 ```powershell
 cd modules\salto\backend
 python app.py
 ```
 
-Endpoint disponible en `http://localhost:5001/api/salto/calcular`:
-
-```
-POST /api/salto/calcular
-Content-Type: multipart/form-data
-
-  video:          archivo .mp4 / .webm / .avi / .mov
-  tipo_salto:     "vertical" | "horizontal"
-  altura_real_m:  float (solo para horizontal, ej. 1.75)
+**Backend sensor (puerto 5000, requiere Arduino conectado):**
+```powershell
+cd modules\sensor\backend
+python app.py
 ```
 
-Respuesta JSON:
-
-```json
-{
-  "tipo_salto": "vertical",
-  "distancia": 45.5,
-  "unidad": "cm",
-  "confianza": 0.98,
-  "frame_despegue": 42,
-  "frame_aterrizaje": 58,
-  "tiempo_vuelo_s": 0.5333
-}
+**Frontend web (puerto 8080):**
+```powershell
+cd integration\web
+python -m http.server 8080
 ```
 
-> **Nota:** El módulo sensor corre en puerto 5000 y el de salto en 5001. Ambos pueden ejecutarse simultáneamente.
+Abrir `http://localhost:8080` en el navegador.
 
-### 3. Modo consola (sin web, para test rápido)
+### Modo consola del sensor (sin web, para test rápido)
 
 ```powershell
 cd modules\sensor\backend
@@ -198,15 +146,6 @@ app.py / Flask        (API)         — GET /distancia → JSON
 frontend/app.js       (Frontend)    — fetch cada 1 s → actualiza DOM
 ```
 
-| Capa | Archivo | Responsabilidad |
-|------|---------|-----------------|
-| Model | `models/sensor_serial.py` | Conexión serial, listado de puertos, parseo de líneas, dataclass `Medicion` |
-| View | `views/consola_view.py` | Salida por consola — sin lógica de negocio |
-| Controller | `controllers/distancia_controller.py` | Flujo de lectura, hilo daemon, acceso thread-safe a la última medición |
-| Config | `config.py` | `DEFAULT_BAUD_RATE`, `SERIAL_TIMEOUT`, `FLASK_PORT` |
-| Entry point web | `app.py` | Flask: inicia el hilo de lectura y expone `GET /distancia` |
-| Entry point consola | `main.py` | Modo debug sin web |
-
 ---
 
 ## Documentación
@@ -214,6 +153,6 @@ frontend/app.js       (Frontend)    — fetch cada 1 s → actualiza DOM
 | Documento | Contenido |
 |-----------|-----------|
 | [docs/arquitectura.md](docs/arquitectura.md) | Diagrama de capas y tecnologías |
-| [docs/flujo_datos.md](docs/flujo_datos.md) | Paso a paso del dato desde el Arduino al navegador |
+| [docs/flujo_datos.md](docs/flujo_datos.md) | Paso a paso del dato desde el dispositivo al navegador |
 | [docs/fases_proyecto.md](docs/fases_proyecto.md) | Estado de cada fase del proyecto |
 | [docs/decisiones_tecnicas.md](docs/decisiones_tecnicas.md) | Justificaciones de diseño |

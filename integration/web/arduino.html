@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensor de Distancia</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="sensor-page">
+    <header class="top-bar">
+        <a href="index.html" class="back-button"><span class="arrow">←</span> Volver</a>
+        <h1 class="header-title">Sensor Ultrasónico</h1>
+    </header>
+
+    <main class="sensor-wrapper">
+        <div class="sensor-display">
+            <div id="estado-conexion" class="estado-badge desconectado">
+                <span class="estado-dot"></span>
+                <span id="estado-texto">Desconectado</span>
+            </div>
+
+            <p class="display-label">Distancia medida</p>
+            <h2 id="distancia-valor" class="display-value">-- cm</h2>
+
+            <p id="timestamp-lectura" class="display-timestamp">Sin lecturas</p>
+        </div>
+    </main>
+
+    <section class="sensor-hud">
+        <button id="btn-conexion" class="sensor-btn">Conectar sensor</button>
+        <p class="sensor-nota">El backend del sensor debe estar corriendo en el puerto 5000.</p>
+    </section>
+
+    <script src="js/api_sensor.js"></script>
+</body>
+</html>

@@ -5,7 +5,7 @@
 - [x] Sketch Arduino con HC-SR04 (promedio de 5 lecturas, filtro 2–400 cm)
 - [x] Backend Python — estructura MVC (Model, View, Controller)
 - [x] API REST Flask — `GET /distancia` con `valor`, `unidad`, `raw`, `timestamp`
-- [x] Frontend web del módulo (`modules/sensor/frontend/`) con polling al endpoint
+- [x] Frontend web del módulo (integrado en `integration/web/arduino.html`) con polling al endpoint
 
 ## Fase 2 — Módulo de salto vertical y horizontal (en progreso)
 
@@ -15,15 +15,18 @@
 - [x] Algoritmo de salto horizontal — calibración geométrica: `D_real = Dp × (Hr / Hp)`
 - [x] `altura_real_m` obligatorio para ambos tipos de salto (necesario para calibración)
 - [x] API REST expuesta (`POST /api/salto/calcular`) en puerto 5001
-- [x] Página de prueba temporal (`http://localhost:5001`) para validar el backend
-- [ ] Frontend web definitivo del módulo (`modules/salto/frontend/`)
+- [x] Frontend web del salto integrado en `integration/web/salto.html`
 - [ ] Cliente móvil para grabar y enviar vídeo (`modules/salto/mobile/`)
 
-## Fase 3 — Integración y UI unificada (pendiente)
+## Fase 3 — Integración y UI unificada (completada)
 
 Prerequisito: Fases 1 y 2 completadas.
 
-- [ ] Diseñar dashboard unificado (`integration/frontend/`)
+- [x] Frontend web unificado (`integration/web/`) con landing + módulos
+- [x] Página de salto (`salto.html`) con cámara, grabación y resultados
+- [x] Página de sensor Arduino (`arduino.html`) con lectura en tiempo real
+- [x] Script único de arranque (`scripts/run_all.bat`)
+- [x] Eliminados frontends individuales y scripts obsoletos
 - [ ] Decidir si se necesita `integration/backend/` (gateway/orquestador)
 - [ ] Histórico de mediciones (base de datos opcional)
 - [ ] Deploy o empaquetado final

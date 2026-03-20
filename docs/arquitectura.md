@@ -33,22 +33,22 @@ Móvil (vídeo grabado) → Upload POST → MediaPipe PoseLandmarker → Cálcul
 | Hardware | Arduino + HC-SR04 | Medir distancia física |
 | Visión artificial | MediaPipe + OpenCV | Analizar vídeo, detectar landmarks anatómicos de los pies |
 | Backend | Python + Flask | Leer serial / procesar vídeo, exponer API REST |
-| Frontend (módulo) | HTML / JS | Visualizar datos del módulo individual |
-| Frontend (integración) | Por definir (Fase 3) | Dashboard unificado |
+| Frontend (integración) | HTML / JS / CSS | Dashboard web unificado (mobile-first) |
 | Móvil (Fase 2) | Por definir | Grabar vídeo del salto y enviarlo al backend |
 
 ## Organización de carpetas
 
 ```
 modules/
-├── sensor/          ← Módulo 1: arduino/ + backend/ + frontend/
-└── salto/           ← Módulo 2: backend/ (MVC + MediaPipe) + mobile/ (+ frontend/ futuro)
+├── sensor/          ← Módulo 1: arduino/ + backend/
+└── salto/           ← Módulo 2: backend/ (MVC + MediaPipe) + mobile/ (futuro)
 
-integration/         ← Fase 3: dashboard web unificado
+integration/web/     ← Frontend web unificado (index + salto + sensor)
+scripts/             ← run_all.bat para arrancar todo
 ```
 
-Cada módulo incluye su propio frontend para desarrollo y pruebas autónomas.
-`integration/` reúne todos los módulos en una única interfaz web en la Fase 3.
+El frontend unificado en `integration/web/` consume ambos backends.
+Cada módulo expone solo su API REST; no tiene frontend propio.
 
 ### Detalle — backend módulo salto
 
@@ -61,9 +61,8 @@ modules/salto/backend/
 │   └── salto_controller.py      ← Orquesta procesamiento + cálculo
 ├── models/
 │   └── video_processor.py       ← MediaPipe PoseLandmarker — extrae pies por frame
-├── services/
-│   └── calculo_service.py       ← Fórmulas cinemáticas puras
-└── utils/                       # Reservado
+└── services/
+    └── calculo_service.py       ← Fórmulas cinemáticas puras
 ```
 
 ## Principios aplicados

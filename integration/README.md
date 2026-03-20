@@ -1,44 +1,51 @@
-# Ejecución del Proyecto: Web y Backend de Salto
+# Ejecución del Proyecto
 
-Esta guía detalla los pasos necesarios para iniciar el entorno de desarrollo local, activando tanto el motor de visión artificial (backend) como la interfaz de usuario (frontend).
+Esta guía detalla los pasos necesarios para iniciar el entorno de desarrollo local.
 
-## 1. Iniciar el Backend (Motor de IA)
+## Arranque rápido (recomendado)
 
-El servidor Python es responsable de procesar los vídeos utilizando MediaPipe y devolver las mediciones. Es necesario arrancarlo en primer lugar.
+Hacer doble clic en:
 
-1. Abrir una terminal.
-2. Navegar al directorio del backend:
+```
+scripts\run_all.bat
+```
+
+Esto arranca automáticamente los tres servicios:
+
+| Servicio | Puerto | Descripción |
+|----------|--------|-------------|
+| Backend Salto | 5001 | API de análisis de saltos (MediaPipe) |
+| Backend Sensor | 5000 | API del sensor Arduino (requiere Arduino conectado) |
+| Frontend Web | 8080 | Interfaz web unificada |
+
+Después, abrir `http://localhost:8080` en el navegador.
+
+## Arranque manual (si se prefiere)
+
+### 1. Backend del salto (puerto 5001)
 
 ```bash
 cd modules/salto/backend
-```
-
-3. Ejecutar el script principal:
-
-```bash
 python app.py
 ```
 
-**Nota:** La terminal debe indicar que el servicio está activo y escuchando en el puerto 5001.
+### 2. Backend del sensor (puerto 5000, opcional)
 
-## 2. Iniciar el Frontend (Interfaz Web)
+Requiere Arduino con HC-SR04 conectado por USB.
 
-La página web necesita su propio servidor de archivos estáticos para cargar los recursos (HTML, CSS, JS) y permitir la conexión desde otros dispositivos en la red.
+```bash
+cd modules/sensor/backend
+python app.py
+```
 
-1. Abrir una nueva terminal (es imprescindible mantener la del backend ejecutándose en segundo plano).
-2. Navegar al directorio donde se encuentra la web:
+### 3. Frontend web (puerto 8080)
 
 ```bash
 cd integration/web
-```
-
-3. Levantar el servidor HTTP nativo de Python en el puerto 8080:
-
-```bash
 python -m http.server 8080
 ```
 
-## 3. Acceder a la Aplicación
+## Acceder a la Aplicación
 
 El método de acceso varía dependiendo de si se utiliza el mismo equipo de desarrollo o un dispositivo externo.
 

@@ -18,7 +18,7 @@
    ```json
    { "valor": 23.45, "unidad": "cm", "raw": "Distancia: 23.45 cm", "timestamp": "2026-03-18T10:30:00+00:00" }
    ```
-7. El **frontend** (`modules/sensor/frontend/`, corriendo en otro servidor/puerto)  
+7. El **frontend** (`integration/web/arduino.html`)
    hace `fetch` al endpoint cada segundo y actualiza el DOM con el valor recibido.
 
 ---
