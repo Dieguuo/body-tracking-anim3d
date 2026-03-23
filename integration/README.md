@@ -1,45 +1,68 @@
-# Integration — Fase 3: App web unificada
+# Ejecución del Proyecto: Web y Backend de Salto
 
-> **Estado: Reservado.** Esta carpeta se activa en la Fase 3, cuando los módulos independientes (`sensor`, `salto`, y futuros) estén listos para unirse en una única interfaz web.
+Esta guía detalla los pasos necesarios para iniciar el entorno de desarrollo local, activando tanto el motor de visión artificial (backend) como la interfaz de usuario (frontend).
 
-## Propósito
+## 1. Iniciar el Backend (Motor de IA)
 
-Construir la aplicación web final que el usuario percibe como una sola herramienta, aunque internamente consuma APIs de módulos independientes.
+El servidor Python es responsable de procesar los vídeos utilizando MediaPipe y devolver las mediciones. Es necesario arrancarlo en primer lugar.
 
-## Estructura prevista
+1. Abrir una terminal.
+2. Navegar al directorio del backend:
 
-```
-integration/
-├── frontend/    ← Dashboard o SPA que une todos los módulos
-└── backend/     ← Orquestador o API gateway (solo si la complejidad lo requiere)
-```
-
-## Visión de la interfaz final
-
-```
-APP WEB FINAL
-├── Vista / módulo Sensor Arduino
-│   ├── distancia en tiempo real
-│   └── estado de conexión
-│
-└── Vista / módulo Salto con móvil
-    ├── cálculo de altura de salto
-    └── resultado y datos asociados
+```bash
+cd modules/salto/backend
 ```
 
-Puede resolverse como:
-- Una **SPA** con navegación entre vistas
-- Un **dashboard** con paneles separados por módulo
-- Una **página única** con secciones
+3. Ejecutar el script principal:
 
-## Qué NO hace esta carpeta ahora
+```bash
+python app.py
+```
 
-Mientras los módulos están en desarrollo individual, cada módulo tiene su propio frontend en `modules/<nombre>/frontend/`. `integration/` no es el lugar para desarrollar ni probar un módulo concreto.
+**Nota:** La terminal debe indicar que el servicio está activo y escuchando en el puerto 5001.
 
-## Checklist Fase 3
+## 2. Iniciar el Frontend (Interfaz Web)
 
-- [ ] Módulo sensor (Fase 1) completado
-- [ ] Módulo salto (Fase 2) completado
-- [ ] Diseñar la UI unificada
-- [ ] Decidir si `integration/backend/` es necesario
-- [ ] Implementar dashboard en `integration/frontend/`
+La página web necesita su propio servidor de archivos estáticos para cargar los recursos (HTML, CSS, JS) y permitir la conexión desde otros dispositivos en la red.
+
+1. Abrir una nueva terminal (es imprescindible mantener la del backend ejecutándose en segundo plano).
+2. Navegar al directorio donde se encuentra la web:
+
+```bash
+cd integration/web
+```
+
+3. Levantar el servidor HTTP nativo de Python en el puerto 8080:
+
+```bash
+python -m http.server 8080
+```
+
+## 3. Acceder a la Aplicación
+
+El método de acceso varía dependiendo de si se utiliza el mismo equipo de desarrollo o un dispositivo externo.
+
+### Pruebas desde el mismo ordenador
+
+Abrir cualquier navegador web y escribir la siguiente dirección:
+
+http://localhost:8080
+
+### Pruebas desde un dispositivo móvil (Recomendado para usar la cámara)
+
+1. El teléfono móvil y el ordenador principal deben estar conectados a la misma red WiFi.
+2. Averiguar la dirección IP local del ordenador (por ejemplo, mediante el comando `ipconfig` en Windows o `ifconfig` en macOS/Linux). Suelen tener el formato `192.168.1.X`.
+3. Abrir el navegador en el teléfono móvil y escribir la IP seguida del puerto:
+
+http://192.168.1.X:8080
+
+## Resolución de Problemas (Troubleshooting)
+
+### Pantalla negra en la cámara (Dispositivos Móviles)
+
+Por políticas de seguridad, los navegadores bloquean la cámara en conexiones no seguras (`http://` con IPs locales). Para sortear esta restricción en entornos de desarrollo utilizando Android/Chrome:
+
+1. Escribir `chrome://flags/#unsafely-treat-insecure-origin-as-secure` en la barra de direcciones del navegador móvil.
+2. Cambiar el menú desplegable resaltado a **Enabled**.
+3. En el cuadro de texto inferior, introducir la dirección completa utilizada para acceder (ej. `http://192.168.1.130:8080`).
+4. Pulsar el botón de reinicio del navegador que aparecerá en la parte inferior de la pantalla.

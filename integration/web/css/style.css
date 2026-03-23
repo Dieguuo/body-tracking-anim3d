@@ -1,0 +1,381 @@
+/* Variables de color y ajustes base para móviles */
+:root {
+    --purple-dark: #2a0845;
+    --purple-light: #6441A5;
+    --text-light: #ffffff;
+    --text-muted: #e0e0e0;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent; /* Evita destellos azules en móviles */
+}
+
+html, body {
+    max-width: 100vw;
+    overflow-x: hidden; /* Corta cualquier elemento que intente salirse de la pantalla */
+}
+
+body {
+    background: linear-gradient(135deg, var(--purple-dark), var(--purple-light));
+    color: var(--text-light);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+}
+
+/* Cabecera (Descripción del proyecto) */
+.hero {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    max-width: 600px;
+    margin-bottom: 2rem;
+}
+
+.hero h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(to right, #fff, #d4b3ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.hero p {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+
+/* Contenedor de las tarjetas */
+.modules-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: 100%;
+    max-width: 500px;
+    padding: 0 1.5rem 4rem 1.5rem;
+}
+
+/* Diseño de los botones tipo tarjeta */
+.module-card {
+    display: block;
+    text-decoration: none;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 2rem;
+    color: var(--text-light);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.module-card:active {
+    transform: scale(0.96); /* Efecto de pulsación fluido en móvil */
+}
+
+.card-content h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.card-content p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+/* --- CLASES PARA LA ANIMACIÓN DE SCROLL --- */
+
+/* Estado inicial: desplazado hacia abajo y transparente */
+.hidden {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Estado final: posición original y opaco */
+.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Retraso para que la segunda tarjeta aparezca después de la primera */
+#card-arduino {
+    transition-delay: 0.15s;
+}
+
+
+
+/* --- VISTA DE CÁMARA (salto.html) --- */
+/* --- VISTA DE CÁMARA REDISEÑADA (salto.html) --- */
+
+.salto-page {
+    /* El gradiente morado cubre toda la pantalla siempre */
+    background: linear-gradient(135deg, var(--purple-dark), var(--purple-light));
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    margin: 0;
+    overflow: hidden; /* Evita scrolls raros al abrir paneles */
+}
+
+/* Cabecera inquebrantable */
+.top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 1.5rem 1rem; /* Se reduce ligeramente el padding lateral */
+    gap: 0.8rem;
+    width: 100%;
+}
+
+.back-button {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text-light);
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1.1rem;
+    flex-shrink: 0; /* Evita que el botón se aplaste */
+}
+
+.header-title {
+    font-size: 1.3rem;
+    margin: 0;
+    color: var(--text-light);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0; /* Crucial: permite que el texto se trunque en pantallas pequeñas */
+}
+
+/* El rectángulo de la cámara */
+.camera-wrapper {
+    padding: 0 1.5rem;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+#vista-camara {
+    width: 100%;
+    max-width: 500px;
+    height: 45vh; /* Altura responsiva */
+    background-color: #000;
+    border-radius: 24px;
+    object-fit: cover;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+/* Panel de controles */
+.camera-hud {
+    flex: 1;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: center;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.config-panel {
+    display: flex;
+    gap: 0.5rem; /* Separación reducida para encajar en pantallas estrechas */
+    width: 100%;
+}
+
+.modern-input {
+    flex: 1;
+    min-width: 0; /* Permite que los inputs se hagan más pequeños que su tamaño por defecto */
+    padding: 0.8rem; /* Padding interno reducido */
+    border-radius: 14px;
+    border: none;
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--purple-dark);
+    font-weight: 600;
+    font-size: 0.95rem; /* Fuente ligeramente más pequeña */
+    outline: none;
+    height: 54px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    gap: 1rem;
+}
+
+/* Botón principal (Grabar) */
+.record-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 60px;
+    border-radius: 30px;
+    border: none;
+    background: #ff3b30;
+    color: white;
+    font-size: 1.2rem;
+    font-weight: bold;
+    box-shadow: 0 4px 15px rgba(255, 59, 48, 0.4);
+    transition: all 0.3s ease;
+}
+
+.record-btn.recording {
+    background: #ff9500;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 149, 0, 0.7); }
+    70% { transform: scale(1.02); box-shadow: 0 0 0 15px rgba(255, 149, 0, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 149, 0, 0); }
+}
+
+/* Botón de subida estético */
+.upload-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    gap: 0.5rem;
+}
+
+.divider {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+}
+
+.upload-btn-visual {
+    width: 100%;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 30px;
+    padding: 1rem;
+    color: var(--text-light);
+    font-weight: bold;
+    height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.input-transparente {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 54px;
+    opacity: 0;
+    z-index: 10;
+}
+
+/* --- PANEL DE RESULTADOS (BOTTOM SHEET) --- */
+.results-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 80vh; /* Ocupa buena parte de la pantalla */
+    background: var(--text-light);
+    border-radius: 40px 40px 0 0;
+    padding: 2.5rem 2rem;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translateY(100%); /* Escondido abajo por defecto */
+    transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
+}
+
+.results-sheet.show {
+    transform: translateY(0); /* Sube suavemente */
+}
+
+.results-content {
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+}
+
+#distancia-resultado {
+    font-size: 4.5rem;
+    margin: 0;
+    background: linear-gradient(135deg, var(--purple-dark), var(--purple-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 900;
+}
+
+.results-subtitle {
+    color: #666;
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+}
+
+/* Cuadrícula de datos técnicos */
+.technical-data-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    width: 100%;
+    margin-bottom: auto; /* Empuja el botón al fondo */
+}
+
+.data-box {
+    background: #f0f0f5;
+    padding: 1rem;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.data-label {
+    color: #888;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.data-value {
+    color: var(--purple-dark);
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+/* El botón grande de Nuevo Salto */
+.primary-btn-large {
+    width: 100%;
+    padding: 1.2rem;
+    border-radius: 30px;
+    border: none;
+    background: linear-gradient(135deg, var(--purple-dark), var(--purple-light));
+    color: white;
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-top: 2rem;
+    box-shadow: 0 8px 20px rgba(100, 65, 165, 0.3);
+    cursor: pointer;
+}

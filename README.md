@@ -18,8 +18,8 @@ Documentación detallada en [`docs/`](docs/).
 
 | Módulo | Estado | Descripción |
 |--------|--------|-------------|
-| **Módulo 1 — Sensor Arduino** | ✅ Fase 1 activa | Mide distancia con HC-SR04, expone los datos via API REST |
-| **Módulo 2 — Salto con móvil** | 🔒 Fase 2 reservada | Calculará altura de salto usando sensores del teléfono |
+| **Módulo 1 — Sensor Arduino** | ✅ Fase 1 completada | Mide distancia con HC-SR04, expone los datos via API REST |
+| **Módulo 2 — Salto con móvil** | 🚧 Fase 2 en progreso | Analiza vídeo con MediaPipe, calcula salto vertical/horizontal |
 | **Integración final** | 🔒 Fase 3 reservada | Dashboard web unificado que consume todos los módulos |
 
 ---
@@ -59,10 +59,17 @@ proyecto-medicion/
 │   │       ├── js/app.js
 │   │       └── css/styles.css
 │   │
-│   └── salto/                   ← Módulo 2 (Fase 2, reservado)
+│   └── salto/                   ← Módulo 2 (Fase 2, backend activo)
 │       ├── README.md
-│       ├── backend/
-│       └── mobile/
+│       ├── backend/             ← Python MVC + Flask API + MediaPipe
+│       │   ├── app.py           ← Entry point web (POST /api/salto/calcular)
+│       │   ├── config.py        ← Constantes centralizadas
+│       │   ├── pose_landmarker_lite.task  ← Modelo MediaPipe
+│       │   ├── controllers/
+│       │   ├── models/
+│       │   ├── services/
+│       │   └── utils/           # Reservado
+│       └── mobile/              # Reservado — cliente móvil
 │
 ├── integration/                 ← Fase 3: dashboard web unificado (reservado)
 │   ├── README.md
@@ -128,6 +135,44 @@ python -m http.server 8080
 ```
 
 Abre `http://localhost:8080` en el navegador.
+
+---
+
+## Cómo ejecutar (Módulo salto — Fase 2)
+
+### Backend — API Flask + MediaPipe
+
+```powershell
+cd modules\salto\backend
+python app.py
+```
+
+Endpoint disponible en `http://localhost:5001/api/salto/calcular`:
+
+```
+POST /api/salto/calcular
+Content-Type: multipart/form-data
+
+  video:          archivo .mp4 / .webm / .avi / .mov
+  tipo_salto:     "vertical" | "horizontal"
+  altura_real_m:  float (solo para horizontal, ej. 1.75)
+```
+
+Respuesta JSON:
+
+```json
+{
+  "tipo_salto": "vertical",
+  "distancia": 45.5,
+  "unidad": "cm",
+  "confianza": 0.98,
+  "frame_despegue": 42,
+  "frame_aterrizaje": 58,
+  "tiempo_vuelo_s": 0.5333
+}
+```
+
+> **Nota:** El módulo sensor corre en puerto 5000 y el de salto en 5001. Ambos pueden ejecutarse simultáneamente.
 
 ### 3. Modo consola (sin web, para test rápido)
 
