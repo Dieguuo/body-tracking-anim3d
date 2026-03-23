@@ -13,7 +13,11 @@
     </header>
 
     <main class="camera-wrapper">
+        <div id="indicador-ia">Cargando Motor...</div>
+        
         <video id="vista-camara" autoplay playsinline muted></video>
+        
+        <canvas id="canvas-esqueleto"></canvas>
     </main>
         
     <section class="camera-hud">
@@ -26,9 +30,9 @@
         </div>
 
         <div class="controls">
-            <button id="btn-grabar" class="record-btn">
+            <button id="btn-grabar" class="record-btn" disabled>
                 <span class="record-icon"></span>
-                <span id="btn-text">Grabar Salto</span>
+                <span id="btn-text">Esperando...</span>
             </button>
             
             <div class="upload-container">
@@ -68,6 +72,6 @@
     </div>
 
     <script src="js/camara.js"></script>
-    <script src="js/api_salto.js"></script>
+    <script type="module" src="js/api_salto.js"></script>
 </body>
 </html>

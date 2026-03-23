@@ -504,3 +504,37 @@ body {
     font-size: 0.8rem;
     text-align: center;
 }
+
+
+.camera-wrapper {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+        }
+        #canvas-esqueleto {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Permite hacer clic a través del canvas */
+            z-index: 5;
+        }
+        #indicador-ia {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 10;
+            background: rgba(255, 165, 0, 0.8);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .ia-lista {
+            background: rgba(40, 167, 69, 0.8) !important;
+        }
