@@ -54,6 +54,38 @@ aumenta bruscamente (derivada positiva).
 Se usa un umbral configurable (`UMBRAL_DERIVADA_Y = 3.0 px/frame`) para  
 filtrar ruido y detectar solo transiciones reales.
 
+## Suavizado de señal y margen ciego en la detección de vuelo
+
+En pruebas con vídeos reales, la derivada cruda de la coordenada Y de  
+los talones presentaba micro-vibraciones que generaban falsos despegues  
+o aterrizajes prematuros.
+
+Se aplican dos mejoras antes de buscar el despegue/aterrizaje:
+
+1. **Media móvil de 3 frames** sobre la señal Y antes de calcular la  
+   derivada, eliminando ruido de alta frecuencia.
+2. **Margen ciego de 5 frames** (`MIN_FRAMES`): tras detectar un despegue,  
+   se ignoran los siguientes 5 frames antes de buscar el aterrizaje.  
+   Esto evita que una fluctuación al inicio de la fase de ascenso se  
+   confunda con un aterrizaje.
+
+Además, para **salto horizontal** el umbral se reduce a `UMBRAL × 0.3`  
+(0.9 px/frame), ya que el desplazamiento vertical es mucho menor que  
+en un salto vertical y un umbral alto no detectaría la fase de vuelo.
+
+## Filtrado de reflejos con `num_poses=2` y selección por tamaño
+
+En vídeos grabados junto a superficies reflectantes (muebles, espejos,  
+ventanas), MediaPipe puede detectar el reflejo de la persona como una  
+pose adicional. Si solo se detecta una pose (`num_poses=1`), MediaPipe  
+puede priorizar el reflejo (que apenas se mueve) sobre la persona real,  
+produciendo desplazamientos casi nulos (~1 cm).
+
+Solución: se configura `num_poses=2` y en `_extraer_pies()` se itera  
+todas las poses detectadas, seleccionando la **silueta más grande**  
+(mayor distancia cabeza-pies en píxeles). El reflejo, al estar más  
+lejos de la cámara, siempre tiene una silueta más pequeña y se descarta.
+
 ## Separación Model / Service / Controller
 
 - **Model** (`video_processor.py`): solo accede al vídeo y a MediaPipe.  
@@ -107,3 +139,29 @@ píxel → metro.
 La respuesta JSON del salto vertical incluye `metodo` (`"hibrido"`,  
 `"pixeles"` o `"cinematica"`), `dist_por_pixeles` y `dist_por_cinematica`  
 para transparencia y depuración.
+
+## Recreación del PoseLandmarker por vídeo
+
+MediaPipe en `RunningMode.VIDEO` exige timestamps monotónicamente  
+crecientes. Si se reutiliza la misma instancia para un segundo vídeo,  
+los timestamps vuelven a 0 y el landmarker falla.
+
+Solución: `VideoProcessor._crear_landmarker()` crea una instancia  
+nueva en cada llamada a `procesar()`, y se cierra con `close()` en  
+un bloque `finally` al terminar. Esto también elimina estado compartido  
+entre peticiones, haciendo el procesador thread-safe.
+
+## Límite de tamaño de archivo (`MAX_CONTENT_LENGTH`)
+
+Sin límite, un usuario podría subir un archivo de varios GB y agotar  
+disco o memoria del servidor. Se configura `MAX_CONTENT_LENGTH` en  
+Flask (100 MB por defecto, configurable en `config.py` con  
+`MAX_UPLOAD_MB`). Flask rechaza automáticamente con 413 las peticiones  
+que excedan el límite.
+
+## Protección contra `fps=0`
+
+Un vídeo corrupto o mal codificado puede reportar `fps=0` a través de  
+OpenCV, lo que causaría divisiones por cero en los cálculos de tiempo  
+de vuelo. Se comprueba `fps <= 0` en `VideoProcessor.procesar()` y se  
+devuelve una lista vacía antes de procesar frames.

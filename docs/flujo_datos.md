@@ -31,11 +31,13 @@
 2. El vídeo se envía al backend como **`POST /api/salto/calcular`** (multipart/form-data).
 3. **`VideoProcessor.procesar()`** (Model) abre el vídeo con OpenCV y lo recorre frame a frame:
    - Convierte cada frame a RGB.
-   - Lo pasa por **MediaPipe PoseLandmarker** para obtener 33 landmarks anatómicos.
+   - Lo pasa por **MediaPipe PoseLandmarker** (`num_poses=2`) para obtener 33 landmarks anatómicos.
+   - Si se detectan varias poses (ej. persona + reflejo), selecciona la **silueta más grande** (mayor distancia cabeza-pies en píxeles).
    - Extrae las coordenadas (X, Y) de talones y puntas de los pies, más la altura de la persona en píxeles.
    - Devuelve una lista de `FramePies` (un objeto por frame).
 4. **`CalculoService`** (Service) recibe la lista de frames y aplica las fórmulas:
-   - **Salto vertical** (método híbrido): calcula la **derivada de la coordenada Y** del talón para detectar despegue y aterrizaje. Combina dos fórmulas:
+   - Primero detecta despegue y aterrizaje: suaviza la señal Y de los talones con **media móvil de 3 frames**, calcula la derivada y busca transiciones que superen el umbral (con un **margen ciego de 5 frames** entre despegue y aterrizaje para evitar falsos positivos).
+   - **Salto vertical** (método híbrido): combina dos fórmulas:
      - *Cinemática*: `h = (1/8) × g × t²` (tiempo de vuelo).
      - *Píxeles calibrados*: calibra con `S = Hr / Hp` y mide `(Y_suelo - Y_pico) × S`.
      - Si ambas están disponibles, resultado = promedio ponderado (60 % píxeles, 40 % cinemática).
