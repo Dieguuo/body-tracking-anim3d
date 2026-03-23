@@ -23,6 +23,17 @@ let framesCalibracion = 0;
 let escalaMetrosPorUnidad = 0;
 let yPicoVuelo = 1.0; 
 let despegueX = 0;
+let umbralDespegue = 0;
+
+// Suavizado exponencial (EMA)
+const EMA_ALPHA = 0.4;
+let yPieSuavizado = null;
+let xPieSuavizado = null;
+
+// Confianza acumulada durante el salto
+let sumaVisibilidad = 0;
+let framesVisibilidad = 0;
+const MIN_VISIBILIDAD = 0.5;
 
 // --- 1. CARGA DEL MOTOR DE IA (CLIENTE) ---
 async function crearPoseLandmarker() {
@@ -89,12 +100,39 @@ async function renderLoop() {
 
 // --- 3. ALGORITMO DE VUELO EN VIVO (HÍBRIDO) ---
 function calcularFaseSalto(landmarks) {
-    const yPieActual = (landmarks[27].y + landmarks[28].y) / 2;
-    const xPieActual = (landmarks[27].x + landmarks[28].x) / 2;
+    const pieIzq = landmarks[27];
+    const pieDer = landmarks[28];
 
+    // Filtrar por visibilidad: si los pies no se ven bien, ignorar frame
+    if (pieIzq.visibility < MIN_VISIBILIDAD || pieDer.visibility < MIN_VISIBILIDAD) return;
+
+    const yPieRaw = (pieIzq.y + pieDer.y) / 2;
+    const xPieRaw = (pieIzq.x + pieDer.x) / 2;
+
+    // Suavizado exponencial (EMA) para evitar jitter
+    if (yPieSuavizado === null) {
+        yPieSuavizado = yPieRaw;
+        xPieSuavizado = xPieRaw;
+    } else {
+        yPieSuavizado = EMA_ALPHA * yPieRaw + (1 - EMA_ALPHA) * yPieSuavizado;
+        xPieSuavizado = EMA_ALPHA * xPieRaw + (1 - EMA_ALPHA) * xPieSuavizado;
+    }
+
+    // Acumular visibilidad para confianza final
+    const visMedia = (pieIzq.visibility + pieDer.visibility) / 2;
+    sumaVisibilidad += visMedia;
+    framesVisibilidad++;
+
+    // --- Fase de calibración (30 frames) ---
     if (framesCalibracion < 30) {
-        alturaBaseY += yPieActual;
+        alturaBaseY += yPieSuavizado;
         framesCalibracion++;
+
+        // Feedback visual de calibración
+        const progreso = Math.round((framesCalibracion / 30) * 100);
+        indicador.style.display = '';
+        indicador.textContent = `Calibrando... ${progreso}%`;
+        indicador.style.background = '#ff9800';
         
         if (framesCalibracion === 30) {
             const alturaRealMetros = parseFloat(document.getElementById('altura-usuario').value);
@@ -103,39 +141,49 @@ function calcularFaseSalto(landmarks) {
             const alturaPersonaNorm = posicionSueloNormal - narizY; 
             
             escalaMetrosPorUnidad = alturaRealMetros / alturaPersonaNorm;
+
+            // Umbral adaptativo: 30% de la altura normalizada de la persona
+            umbralDespegue = posicionSueloNormal - (alturaPersonaNorm * 0.06);
+
+            indicador.textContent = '¡Listo! Salta';
+            indicador.style.background = '#4caf50';
+            setTimeout(() => { indicador.style.display = 'none'; }, 1500);
         }
         return;
     }
 
     const posicionSueloNormal = alturaBaseY / 30;
-    const umbralDespegue = posicionSueloNormal - 0.04; 
     
-    if (estadoSalto === 'suelo' && yPieActual < umbralDespegue) {
+    if (estadoSalto === 'suelo' && yPieSuavizado < umbralDespegue) {
         estadoSalto = 'aire';
         tiempoDespegue = performance.now();
-        despegueX = xPieActual; 
-        yPicoVuelo = yPieActual; 
+        despegueX = xPieSuavizado; 
+        yPicoVuelo = yPieSuavizado;
+        // Reiniciar contadores de confianza para medir solo durante el salto
+        sumaVisibilidad = 0;
+        framesVisibilidad = 0;
     } 
     else if (estadoSalto === 'aire') {
-        if (yPieActual < yPicoVuelo) {
-            yPicoVuelo = yPieActual;
+        if (yPieSuavizado < yPicoVuelo) {
+            yPicoVuelo = yPieSuavizado;
         }
 
-        if (yPieActual > umbralDespegue) {
+        if (yPieSuavizado > umbralDespegue) {
             estadoSalto = 'suelo';
             const tiempoAterrizaje = performance.now();
-            const aterrizajeX = xPieActual;
+            const aterrizajeX = xPieSuavizado;
             
             const tiempoVueloSegundos = (tiempoAterrizaje - tiempoDespegue) / 1000;
             
             if (tiempoVueloSegundos > 0.15) { 
-                finalizarSaltoEnVivo(tiempoVueloSegundos, despegueX, aterrizajeX, posicionSueloNormal, yPicoVuelo);
+                const confianzaReal = framesVisibilidad > 0 ? sumaVisibilidad / framesVisibilidad : 0;
+                finalizarSaltoEnVivo(tiempoVueloSegundos, despegueX, aterrizajeX, posicionSueloNormal, yPicoVuelo, confianzaReal);
             }
         }
     }
 }
 
-function finalizarSaltoEnVivo(tiempoVuelo, startX, endX, ySuelo, yPico) {
+function finalizarSaltoEnVivo(tiempoVuelo, startX, endX, ySuelo, yPico, confianza) {
     document.dispatchEvent(new Event('detenerDeteccion')); 
     document.dispatchEvent(new Event('restaurarBotonCamara'));
 
@@ -164,7 +212,7 @@ function finalizarSaltoEnVivo(tiempoVuelo, startX, endX, ySuelo, yPico) {
         distancia: distanciaFinalCm,
         unidad: 'cm',
         tipo_salto: textoTipo,
-        confianza: 0.95,
+        confianza: Math.min(confianza, 1.0),
         tiempo_vuelo_s: tiempoVuelo.toFixed(3),
         frame_despegue: 'Directo',
         frame_aterrizaje: 'Directo'
@@ -186,7 +234,11 @@ document.addEventListener('iniciarDeteccion', () => {
     estadoSalto = 'suelo';
     framesCalibracion = 0;
     alturaBaseY = 0;
-    yPicoVuelo = 1.0; 
+    yPicoVuelo = 1.0;
+    yPieSuavizado = null;
+    xPieSuavizado = null;
+    sumaVisibilidad = 0;
+    framesVisibilidad = 0;
     
     renderLoop();
 });
