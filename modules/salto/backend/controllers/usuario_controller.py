@@ -40,8 +40,34 @@ def _serializar(row: dict) -> dict:
 
 @usuarios_bp.route("/api/usuarios", methods=["GET"])
 def listar():
-    rows = _usuario_model.obtener_todos()
-    return jsonify([_serializar(r) for r in rows])
+    paginado = request.args.get("paginado", "0").strip() == "1"
+    search = (request.args.get("search") or "").strip()
+
+    if not paginado:
+        rows = _usuario_model.obtener_todos()
+        return jsonify([_serializar(r) for r in rows])
+
+    try:
+        limit = int(request.args.get("limit", 20))
+        offset = int(request.args.get("offset", 0))
+    except ValueError:
+        return jsonify({"error": "limit y offset deben ser enteros"}), 400
+
+    if limit <= 0 or limit > 100:
+        return jsonify({"error": "limit debe estar entre 1 y 100"}), 400
+    if offset < 0:
+        return jsonify({"error": "offset debe ser >= 0"}), 400
+
+    rows = _usuario_model.obtener_paginados(search=search or None, limit=limit, offset=offset)
+    total = _usuario_model.contar(search=search or None)
+
+    return jsonify({
+        "items": [_serializar(r) for r in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "has_more": (offset + len(rows)) < total,
+    })
 
 
 @usuarios_bp.route("/api/usuarios", methods=["POST"])

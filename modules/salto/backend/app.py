@@ -58,6 +58,7 @@ def calcular_salto():
         - altura_real_m: float (obligatorio para ambos tipos)
         - id_usuario: int (opcional — si se envía, guarda el resultado en BD)
         - metodo_origen: "ia_vivo" | "video_galeria" (opcional, default: video_galeria)
+        - guardar_video_bd: bool (opcional; si es true y se guarda salto, persiste el vídeo en BD)
     """
     # Validar que viene el archivo de vídeo
     if "video" not in request.files:
@@ -133,6 +134,20 @@ def calcular_salto():
                     metodo_origen=metodo_origen,
                 )
                 respuesta["id_salto"] = id_salto
+
+                guardar_video_bd = (request.form.get("guardar_video_bd", "false").strip().lower() in {
+                    "1", "true", "si", "sí", "yes"
+                })
+                if guardar_video_bd:
+                    with open(ruta_video, "rb") as f:
+                        video_bytes = f.read()
+                    guardado = salto_model.guardar_video_bd(
+                        id_salto=id_salto,
+                        video_bytes=video_bytes,
+                        video_nombre=secure_filename(archivo.filename) or nombre_archivo,
+                        video_mime=archivo.mimetype,
+                    )
+                    respuesta["video_guardado_bd"] = bool(guardado)
             except Exception:
                 logging.warning("No se pudo guardar el salto en BD (id_usuario=%s)", id_usuario_str)
 

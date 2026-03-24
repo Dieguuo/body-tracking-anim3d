@@ -9,9 +9,48 @@ document.addEventListener('DOMContentLoaded', () => {
     
     let detectando = false;
 
+    function mostrarGuiaPermisos(error) {
+        const host = window.location.hostname;
+        const protocolo = window.location.protocol;
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert(
+                `Este navegador no permite acceso a camara en esta pagina.\n\n` +
+                `Prueba con Chrome actualizado y revisa permisos del sitio.\n` +
+                `URL actual: ${protocolo}//${host}`
+            );
+            return;
+        }
+
+        if (error && error.name === 'NotAllowedError') {
+            alert(
+                'Permiso de camara denegado o bloqueado por el navegador.\n\n' +
+                'En Chrome: icono del candado -> Configuracion del sitio -> Camara -> Permitir, luego recarga.'
+            );
+            return;
+        }
+
+        if (error && error.name === 'NotFoundError') {
+            alert('No se encontro ninguna camara disponible en el dispositivo.');
+            return;
+        }
+
+        if (error && error.name === 'NotReadableError') {
+            alert('La camara esta siendo usada por otra aplicacion. Cierra otras apps y vuelve a intentarlo.');
+            return;
+        }
+
+        alert('No se pudo acceder a la camara. Revisa permisos del navegador y vuelve a cargar la pagina.');
+    }
+
     // --- 1. INICIALIZAR CÁMARA ---
     async function iniciarCamara() {
         try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                mostrarGuiaPermisos();
+                return;
+            }
+
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { 
                     facingMode: 'environment',
@@ -24,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
             videoElement.srcObject = stream;
         } catch (error) {
             console.error('Error al acceder a la cámara:', error);
-            alert('Es necesario dar permisos de cámara para medir el salto.');
+            mostrarGuiaPermisos(error);
         }
     }
 

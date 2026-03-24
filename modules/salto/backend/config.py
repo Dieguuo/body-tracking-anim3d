@@ -34,7 +34,7 @@ MAX_UPLOAD_MB: int = 100
 DB_CONFIG = {
     "host": "localhost",
     "user": "root",
-    "password": "",
+    "password": "1234",
     "database": "bd_anim3d_saltos",
     "charset": "utf8mb4",
     "collation": "utf8mb4_unicode_ci",

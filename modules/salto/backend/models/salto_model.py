@@ -8,6 +8,60 @@ from models.db import get_connection
 class SaltoModel:
     """CRUD para la tabla saltos."""
 
+    def _tiene_columna_video_blob(self) -> bool:
+        """Comprueba si la tabla `saltos` dispone de la columna `video_blob`."""
+        with get_connection() as (conn, cur):
+            cur.execute("SHOW COLUMNS FROM saltos LIKE 'video_blob'")
+            return cur.fetchone() is not None
+
+    def _asegurar_columnas_video(self) -> bool:
+        """
+        Crea columnas de vídeo en `saltos` si no existen.
+
+        Devuelve True si el esquema queda listo para guardar el binario.
+        """
+        try:
+            if self._tiene_columna_video_blob():
+                return True
+
+            with get_connection() as (conn, cur):
+                cur.execute(
+                    "ALTER TABLE saltos "
+                    "ADD COLUMN video_blob LONGBLOB NULL, "
+                    "ADD COLUMN video_nombre VARCHAR(255) NULL, "
+                    "ADD COLUMN video_mime VARCHAR(100) NULL"
+                )
+            return True
+        except Exception:
+            return False
+
+    def guardar_video_bd(
+        self,
+        id_salto: int,
+        video_bytes: bytes,
+        video_nombre: str | None,
+        video_mime: str | None,
+    ) -> bool:
+        """
+        Guarda el vídeo asociado a un salto en la tabla `saltos`.
+
+        Retorna False si no se pudo preparar el esquema o actualizar el registro.
+        """
+        if not video_bytes:
+            return False
+
+        if not self._asegurar_columnas_video():
+            return False
+
+        with get_connection() as (conn, cur):
+            cur.execute(
+                "UPDATE saltos "
+                "SET video_blob = %s, video_nombre = %s, video_mime = %s "
+                "WHERE id_salto = %s",
+                (video_bytes, video_nombre, video_mime, id_salto),
+            )
+            return cur.rowcount > 0
+
     def obtener_todos(self) -> list[dict]:
         with get_connection() as (conn, cur):
             cur.execute(
