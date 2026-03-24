@@ -32,10 +32,7 @@ let toastTimer = null;
 const SALTOS_OBJETIVO_COMPARATIVA = 4;
 let medidasComparativa = [];
 
-function getBackendBaseUrl() {
-    const ipServidor = window.location.hostname;
-    return `http://${ipServidor}:5001`;
-}
+// getBackendBaseUrl() se carga desde js/config.js
 
 function getUsuarioActivo() {
     const idUsuario = sessionStorage.getItem('idUser');
@@ -168,7 +165,6 @@ async function crearPoseLandmarker() {
             indicador.style.display = 'none';
         }, 3000);
     } catch (error) {
-        console.error('Error al cargar MediaPipe:', error);
         indicador.textContent = 'Error IA. Usa archivos.';
         indicador.style.background = 'red';
     }
@@ -259,7 +255,6 @@ function calcularFaseSalto(landmarks) {
             if (tiempoVueloSegundos > 0.15) {
                 finalizarSaltoEnVivo(tiempoVueloSegundos, despegueX, aterrizajeX, posicionSueloNormal, yPicoVuelo)
                     .catch((error) => {
-                        console.error('Error al finalizar salto en vivo:', error);
                         mostrarToast(`No se pudo guardar el salto: ${error.message}`, 'error', 3200);
                     });
             }
@@ -526,8 +521,7 @@ document.addEventListener('videoListo', async (evento) => {
 
         procesarResultadoSegunModo(datosGenerados);
     } catch (error) {
-        console.error('Fallo en la comunicación:', error);
-        mostrarToast(`Error al conectar con ${window.location.hostname}:5001. Comprueba que app.py esta arrancado.`, 'error', 3600);
+        mostrarToast(`Error al conectar con el backend. Comprueba que app.py esta arrancado.`, 'error', 3600);
     }
 });
 

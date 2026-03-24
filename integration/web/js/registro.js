@@ -1,7 +1,4 @@
-function getBackendBaseUrl() {
-    const ipServidor = window.location.hostname;
-    return `http://${ipServidor}:5001`;
-}
+// getBackendBaseUrl() se carga desde js/config.js
 
 function setUsuarioActivo(usuario) {
     sessionStorage.setItem('idUser', String(usuario.id_usuario));

@@ -62,7 +62,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             videoElement.srcObject = stream;
         } catch (error) {
-            console.error('Error al acceder a la cámara:', error);
             mostrarGuiaPermisos(error);
         }
     }

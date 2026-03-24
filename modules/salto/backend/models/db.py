@@ -19,7 +19,8 @@ def _get_pool() -> pooling.MySQLConnectionPool:
     if _pool is None:
         _pool = pooling.MySQLConnectionPool(
             pool_name="anim3d_pool",
-            pool_size=5,
+            pool_size=10,
+            pool_reset_session=True,
             **DB_CONFIG,
         )
     return _pool
@@ -37,7 +38,11 @@ class get_connection:
 
     def __enter__(self):
         self.conn = _get_pool().get_connection()
-        self.cursor = self.conn.cursor(dictionary=True)
+        try:
+            self.cursor = self.conn.cursor(dictionary=True)
+        except Exception:
+            self.conn.close()
+            raise
         return self.conn, self.cursor
 
     def __exit__(self, exc_type, exc_val, exc_tb):

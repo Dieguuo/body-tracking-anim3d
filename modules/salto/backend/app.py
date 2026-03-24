@@ -15,19 +15,23 @@ import logging
 import os
 import uuid
 
+from dotenv import load_dotenv
+load_dotenv()  # carga .env antes de importar config
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
-from config import FLASK_PORT, UPLOAD_FOLDER, EXTENSIONES_PERMITIDAS, MAX_UPLOAD_MB
+from config import FLASK_PORT, UPLOAD_FOLDER, EXTENSIONES_PERMITIDAS, MAX_UPLOAD_MB, CORS_ORIGINS
 from controllers.salto_controller import SaltoController
 from controllers.usuario_controller import usuarios_bp
 from controllers.salto_db_controller import saltos_bp
 from models.salto_model import SaltoModel
+import mysql.connector
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
-CORS(app)
+CORS(app, origins=CORS_ORIGINS)
 
 app.register_blueprint(usuarios_bp)
 app.register_blueprint(saltos_bp)
@@ -148,8 +152,8 @@ def calcular_salto():
                         video_mime=archivo.mimetype,
                     )
                     respuesta["video_guardado_bd"] = bool(guardado)
-            except Exception:
-                logging.warning("No se pudo guardar el salto en BD (id_usuario=%s)", id_usuario_str)
+            except (ValueError, KeyError, OSError, mysql.connector.Error) as exc:
+                logging.warning("No se pudo guardar el salto en BD (id_usuario=%s): %s", id_usuario_str, exc)
 
         return jsonify(respuesta)
     except Exception:
