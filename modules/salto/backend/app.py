@@ -15,18 +15,29 @@ import logging
 import os
 import uuid
 
+from dotenv import load_dotenv
+load_dotenv()  # carga .env antes de importar config
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
-from config import FLASK_PORT, UPLOAD_FOLDER, EXTENSIONES_PERMITIDAS, MAX_UPLOAD_MB
+from config import FLASK_PORT, UPLOAD_FOLDER, EXTENSIONES_PERMITIDAS, MAX_UPLOAD_MB, CORS_ORIGINS
 from controllers.salto_controller import SaltoController
+from controllers.usuario_controller import usuarios_bp
+from controllers.salto_db_controller import saltos_bp
+from models.salto_model import SaltoModel
+import mysql.connector
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
-CORS(app)
+CORS(app, origins=CORS_ORIGINS)
+
+app.register_blueprint(usuarios_bp)
+app.register_blueprint(saltos_bp)
 
 controller = SaltoController()
+salto_model = SaltoModel()
 
 # Crear carpeta de uploads si no existe
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -49,6 +60,9 @@ def calcular_salto():
         - video: archivo .mp4 / .webm / .avi / .mov
         - tipo_salto: "vertical" | "horizontal"
         - altura_real_m: float (obligatorio para ambos tipos)
+        - id_usuario: int (opcional — si se envía, guarda el resultado en BD)
+        - metodo_origen: "ia_vivo" | "video_galeria" (opcional, default: video_galeria)
+        - guardar_video_bd: bool (opcional; si es true y se guarda salto, persiste el vídeo en BD)
     """
     # Validar que viene el archivo de vídeo
     if "video" not in request.files:
@@ -94,7 +108,7 @@ def calcular_salto():
     try:
         resultado = controller.procesar_salto(ruta_video, tipo_salto, altura_real_m)
 
-        return jsonify({
+        respuesta = {
             "tipo_salto": resultado.tipo_salto,
             "distancia": resultado.distancia,
             "unidad": resultado.unidad,
@@ -105,7 +119,43 @@ def calcular_salto():
             "metodo": resultado.metodo,
             "dist_por_pixeles": resultado.dist_por_pixeles,
             "dist_por_cinematica": resultado.dist_por_cinematica,
-        })
+        }
+
+        # Guardar en BD si se proporcionó id_usuario
+        id_usuario_str = request.form.get("id_usuario")
+        if id_usuario_str and resultado.distancia > 0:
+            try:
+                id_usuario = int(id_usuario_str)
+                metodo_origen = request.form.get("metodo_origen", "video_galeria").strip().lower()
+                if metodo_origen not in ("ia_vivo", "video_galeria", "sensor_arduino"):
+                    metodo_origen = "video_galeria"
+                id_salto = salto_model.crear(
+                    id_usuario=id_usuario,
+                    tipo_salto=resultado.tipo_salto,
+                    distancia_cm=round(resultado.distancia),
+                    tiempo_vuelo_s=resultado.tiempo_vuelo_s,
+                    confianza_ia=resultado.confianza,
+                    metodo_origen=metodo_origen,
+                )
+                respuesta["id_salto"] = id_salto
+
+                guardar_video_bd = (request.form.get("guardar_video_bd", "false").strip().lower() in {
+                    "1", "true", "si", "sí", "yes"
+                })
+                if guardar_video_bd:
+                    with open(ruta_video, "rb") as f:
+                        video_bytes = f.read()
+                    guardado = salto_model.guardar_video_bd(
+                        id_salto=id_salto,
+                        video_bytes=video_bytes,
+                        video_nombre=secure_filename(archivo.filename) or nombre_archivo,
+                        video_mime=archivo.mimetype,
+                    )
+                    respuesta["video_guardado_bd"] = bool(guardado)
+            except (ValueError, KeyError, OSError, mysql.connector.Error) as exc:
+                logging.warning("No se pudo guardar el salto en BD (id_usuario=%s): %s", id_usuario_str, exc)
+
+        return jsonify(respuesta)
     except Exception:
         logging.exception("Error procesando vídeo %s", nombre_archivo)
         return jsonify({
@@ -120,4 +170,5 @@ def calcular_salto():
 if __name__ == "__main__":
     print(f"[INFO] Módulo Salto — API disponible en http://localhost:{FLASK_PORT}")
     print(f"[INFO] POST /api/salto/calcular")
+    print(f"[INFO] CRUD /api/usuarios, /api/saltos")
     app.run(host="0.0.0.0", port=FLASK_PORT, debug=False)

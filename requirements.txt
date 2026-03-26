@@ -4,3 +4,5 @@ flask-cors
 mediapipe
 opencv-python
 numpy
+mysql-connector-python
+python-dotenv

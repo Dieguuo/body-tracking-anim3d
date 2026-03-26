@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Usuario - Anim3D</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Pequeño ajuste específico para espaciar los inputs del formulario */
+        .form-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            width: 100%;
+            margin-top: 1.5rem;
+        }
+        .form-title {
+            color: var(--text-light);
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+        .form-subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body class="sensor-page"> <header class="top-bar">
+        <a href="index.html" class="back-button"><span class="arrow">←</span> Volver</a>
+    </header>
+
+    <main class="sensor-wrapper">
+        <div class="sensor-display"> <h1 class="form-title">Nuevo Usuario</h1>
+            <p class="form-subtitle">Introduce los datos para el análisis físico</p>
+
+            <form id="registro-form" class="form-container">
+                <input type="text" id="alias" name="alias" class="modern-input" placeholder="Alias (Ej: Juan99)" required maxlength="50">
+                
+                <input type="text" id="nombre_completo" name="nombre_completo" class="modern-input" placeholder="Nombre completo" required maxlength="100">
+                
+                <input type="number" id="altura_m" name="altura_m" class="modern-input" placeholder="Altura en metros (Ej: 1.75)" required step="0.01" min="0.50" max="2.50">
+                
+                <button type="submit" class="primary-btn-large" id="btn-submit">
+                    Registrar Perfil
+                </button>
+            </form>
+            
+            <div id="mensaje-estado" class="sensor-nota" style="margin-top: 1rem;"></div>
+        </div>
+    </main>
+
+    <script src="js/config.js"></script>
+    <script src="js/registro.js"></script>
+</body>
+</html>

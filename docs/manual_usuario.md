@@ -192,3 +192,56 @@ Si quieres grabar un salto con la cámara del móvil:
 | "Extensión no permitida" | Formato de vídeo no soportado | Usar .mp4, .webm, .avi o .mov |
 | Badge rojo en sensor | Arduino no conectado o backend caído | Verificar USB + que el backend esté corriendo |
 | Los resultados no parecen correctos | Mala grabación o poca iluminación | Repetir grabación siguiendo los consejos de la sección 4 |
+
+---
+
+## 8. API REST — Usuarios, Saltos y Comparativa
+
+El backend del módulo salto (puerto 5001) expone, además del endpoint de cálculo, una API CRUD completa para gestionar usuarios y saltos en base de datos MySQL.
+
+### 8.1 Usuarios
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/api/usuarios` | Lista todos los usuarios |
+| `POST` | `/api/usuarios` | Crea un usuario (JSON: `alias`, `nombre_completo`, `altura_m`) |
+| `GET` | `/api/usuarios/<id>` | Obtiene un usuario por ID |
+| `PUT` | `/api/usuarios/<id>` | Actualiza un usuario (JSON: mismos campos) |
+| `DELETE` | `/api/usuarios/<id>` | Elimina un usuario y todos sus saltos (CASCADE) |
+
+### 8.2 Saltos
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/api/saltos` | Lista todos los saltos |
+| `POST` | `/api/saltos` | Registra un salto manualmente (JSON: `id_usuario`, `tipo_salto`, `distancia_cm`, `metodo_origen`) |
+| `GET` | `/api/saltos/<id>` | Obtiene un salto por ID |
+| `DELETE` | `/api/saltos/<id>` | Elimina un salto |
+| `GET` | `/api/usuarios/<id>/saltos` | Lista los saltos de un usuario |
+
+### 8.3 Progreso y comparativa
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/api/usuarios/<id>/progreso` | Cuántos saltos tiene y cuántos le faltan (mín. 4+4) |
+| `GET` | `/api/usuarios/<id>/comparativa` | Estadísticas por tipo (mejor, peor, media, último, evolución). Devuelve 403 si no cumple el mínimo |
+
+### 8.4 Guardado automático desde el cálculo
+
+El endpoint `POST /api/salto/calcular` acepta opcionalmente:
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `id_usuario` | int | Si se envía, el resultado se guarda automáticamente en BD |
+| `metodo_origen` | string | `"ia_vivo"`, `"video_galeria"` o `"sensor_arduino"` (por defecto: `video_galeria`) |
+
+La respuesta incluirá `id_salto` si el guardado fue exitoso.
+
+### 8.5 Base de datos
+
+MySQL con base de datos `bd_anim3d_saltos`. Dos tablas:
+
+- **`usuarios`** — `id_usuario`, `alias` (UNIQUE), `nombre_completo`, `altura_m`, `fecha_registro`
+- **`saltos`** — `id_salto`, `id_usuario` (FK), `tipo_salto`, `distancia_cm`, `tiempo_vuelo_s`, `confianza_ia`, `metodo_origen`, `fecha_salto`
+
+La conexión se configura en `modules/salto/backend/config.py` (`DB_CONFIG`).

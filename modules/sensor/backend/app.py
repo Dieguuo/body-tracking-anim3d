@@ -15,14 +15,18 @@ Endpoints:
 """
 
 import sys
+
+from dotenv import load_dotenv
+load_dotenv()  # carga .env antes de importar config
+
 from flask import Flask, jsonify
 from flask_cors import CORS
 
-from config import DEFAULT_BAUD_RATE, FLASK_PORT
+from config import DEFAULT_BAUD_RATE, FLASK_PORT, CORS_ORIGINS
 from controllers.distancia_controller import DistanciaController
 
 app = Flask(__name__)
-CORS(app)  # Necesario para que el frontend en otro origen pueda hacer fetch
+CORS(app, origins=CORS_ORIGINS)
 controller = DistanciaController(baud_rate=DEFAULT_BAUD_RATE)
 
 
