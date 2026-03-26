@@ -4,7 +4,7 @@
  * Pide GET /distancia cada segundo mientras esté activo y actualiza la UI.
  */
 
-const SENSOR_PORT = 5000;
+// BACKEND_SENSOR_PORT se carga desde js/config.js
 const POLL_INTERVAL_MS = 1000;
 
 const elValor = document.getElementById("distancia-valor");
@@ -17,7 +17,7 @@ let polling = false;
 let timerId = null;
 
 function sensorUrl() {
-    return `http://${window.location.hostname}:${SENSOR_PORT}/distancia`;
+    return `${getSensorBaseUrl()}/distancia`;
 }
 
 function setConectado(conectado) {

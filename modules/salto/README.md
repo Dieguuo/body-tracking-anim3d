@@ -8,18 +8,23 @@ Recibe un vídeo grabado desde un móvil, lo analiza fotograma a fotograma con *
 
 ```
 salto/
-├── backend/                         ← Python MVC + Flask API
-│   ├── app.py                       ← Entry point web (POST /api/salto/calcular)
-│   ├── config.py                    ← Constantes centralizadas
+├── backend/                         ← Python MVC + Flask API + MySQL
+│   ├── app.py                       ← Entry point web (cálculo + CRUD usuarios/saltos)
+│   ├── config.py                    ← Constantes centralizadas + DB_CONFIG
 │   ├── pose_landmarker_lite.task    ← Modelo MediaPipe descargado
 │   ├── controllers/
-│   │   └── salto_controller.py      ← Orquesta procesamiento + cálculo
+│   │   ├── salto_controller.py      ← Orquesta procesamiento + cálculo
+│   │   ├── usuario_controller.py    ← CRUD usuarios + progreso + comparativa
+│   │   └── salto_db_controller.py   ← CRUD saltos en BD
 │   ├── models/
-│   │   └── video_processor.py       ← MediaPipe PoseLandmarker — extrae pies por frame
+│   │   ├── db.py                    ← Pool de conexiones MySQL
+│   │   ├── video_processor.py       ← MediaPipe PoseLandmarker — extrae pies por frame
+│   │   ├── usuario_model.py         ← Queries tabla usuarios
+│   │   └── salto_model.py           ← Queries tabla saltos
 │   ├── services/
-│   │   └── calculo_service.py       ← Fórmulas: vertical (híbrido cinemática + calibración) + horizontal (calibración)
-│   └── utils/                       # Reservado
-│   └── test_frontend.html           ← Página de prueba temporal (servida en /)
+│   │   ├── calculo_service.py       ← Fórmulas: vertical (híbrido cinemática + calibración) + horizontal (calibración)
+│   │   └── comparativa_service.py   ← Lógica de negocio: progreso (mín. 4+4) y estadísticas
+│   └── uploads/                     ← Vídeos temporales (auto-limpieza)
 ├── mobile/                          # Reservado — cliente móvil (Fase 2)
 └── README.md
 ```
@@ -34,10 +39,11 @@ cd modules\salto\backend
 python app.py
 ```
 
-Backend en `http://localhost:5001/api/salto/calcular`
-Página de prueba en `http://localhost:5001` (temporal, para validar el backend)
+Backend en `http://localhost:5001`
 
-## Endpoint
+## Endpoints
+
+### Cálculo de salto
 
 ```
 POST /api/salto/calcular
@@ -49,6 +55,8 @@ Content-Type: multipart/form-data
 | `video` | archivo | Siempre | Vídeo .mp4 / .webm / .avi / .mov |
 | `tipo_salto` | string | Siempre | `"vertical"` o `"horizontal"` |
 | `altura_real_m` | float | Siempre | Altura real del usuario en metros (ej. `1.75`). Necesaria para calibrar la conversión píxel → metro. |
+| `id_usuario` | int | Opcional | Si se envía, el resultado se guarda automáticamente en BD |
+| `metodo_origen` | string | Opcional | `"ia_vivo"`, `"video_galeria"` o `"sensor_arduino"` (default: `video_galeria`) |
 
 **Respuesta JSON:**
 
@@ -82,7 +90,36 @@ CalculoService        (Service)     — fórmulas de cinemática y calibración
 SaltoController       (Controller)  — orquesta modelo + servicio
       │
 Flask app.py          (API)         — POST /api/salto/calcular → JSON
+                                        ↕
+                                    MySQL (usuarios + saltos)
 ```
+
+### CRUD Usuarios
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/api/usuarios` | Lista todos |
+| `POST` | `/api/usuarios` | Crea (JSON: `alias`, `nombre_completo`, `altura_m`) |
+| `GET` | `/api/usuarios/<id>` | Obtiene por ID |
+| `PUT` | `/api/usuarios/<id>` | Actualiza |
+| `DELETE` | `/api/usuarios/<id>` | Elimina (CASCADE a saltos) |
+
+### CRUD Saltos
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/api/saltos` | Lista todos |
+| `POST` | `/api/saltos` | Registra manualmente (JSON: `id_usuario`, `tipo_salto`, `distancia_cm`, `metodo_origen`) |
+| `GET` | `/api/saltos/<id>` | Obtiene por ID |
+| `DELETE` | `/api/saltos/<id>` | Elimina |
+| `GET` | `/api/usuarios/<id>/saltos` | Saltos de un usuario |
+
+### Progreso y Comparativa
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/api/usuarios/<id>/progreso` | Cuántos saltos tiene vs mínimo (4+4) |
+| `GET` | `/api/usuarios/<id>/comparativa` | Estadísticas por tipo (mejor, peor, media, último, evolución). 403 si no cumple mínimo |
 
 ## Algoritmos
 
@@ -130,11 +167,13 @@ MediaPipe se configura con `num_poses=2` para detectar hasta dos personas. Si ha
 
 - [x] Backend MVC funcional
 - [x] Procesamiento de vídeo con MediaPipe PoseLandmarker (Tasks API)
-- [x] Algoritmo de salto vertical (tiempo de vuelo)
+- [x] Algoritmo de salto vertical (método híbrido cinemática + píxeles)
 - [x] Algoritmo de salto horizontal (calibración geométrica)
-- [x] API REST expuesta (`POST /api/salto/calcular`)
-- [x] Página de prueba temporal servida desde Flask (`test_frontend.html`)
+- [x] API REST cálculo (`POST /api/salto/calcular`)
+- [x] Base de datos MySQL — tablas `usuarios` y `saltos` (1:N)
+- [x] CRUD REST para usuarios y saltos
+- [x] Guardado automático en BD desde el cálculo (con `id_usuario`)
+- [x] Regla de negocio: mínimo 4+4 saltos para comparativa
+- [x] Endpoint de progreso y comparativa (estadísticas al vuelo)
+- [x] Frontend web integrado en `integration/web/salto.html`
 - [ ] Cliente móvil para grabar y enviar vídeo (`mobile/`)
-- [ ] Frontend web definitivo del módulo (`frontend/`)
-- [ ] Implementar `modules/salto/backend/`
-- [ ] Implementar `modules/salto/mobile/`

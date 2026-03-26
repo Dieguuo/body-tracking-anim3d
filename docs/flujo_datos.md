@@ -47,4 +47,36 @@
    ```json
    { "tipo_salto": "vertical", "distancia": 34.12, "unidad": "cm", "confianza": 0.98, "frame_despegue": 42, "frame_aterrizaje": 58, "tiempo_vuelo_s": 0.5333, "metodo": "hibrido", "dist_por_pixeles": 36.45, "dist_por_cinematica": 30.67 }
    ```
-7. El archivo de vídeo temporal se **elimina automáticamente** tras el procesamiento.
+7. Si se envió `id_usuario` en la petición, el resultado se **persiste automáticamente** en la tabla `saltos` de MySQL y la respuesta incluye `id_salto`.
+8. El archivo de vídeo temporal se **elimina automáticamente** tras el procesamiento.
+
+---
+
+## Módulo 2 — Gestión de usuarios y saltos (CRUD + BD)
+
+### Paso a paso
+
+1. **`POST /api/usuarios`** recibe JSON con `alias`, `nombre_completo`, `altura_m`.
+2. **`UsuarioModel.crear()`** ejecuta un INSERT parametrizado en la tabla `usuarios`.
+3. El pool de conexiones (`db.py`) obtiene una conexión, ejecuta la query, hace commit y devuelve la conexión al pool.
+4. El usuario puede registrar saltos manualmente (`POST /api/saltos`) o automáticamente (al calcular vía vídeo con `id_usuario`).
+
+### Flujo de progreso y comparativa
+
+```
+Frontend pide GET /api/usuarios/<id>/progreso
+      │
+SaltoModel.contar_por_tipo()  →  SELECT COUNT(*) GROUP BY tipo_salto
+      │
+comparativa_service.calcular_progreso()  →  JSON con conteo + faltan
+      │
+Si completo (≥4 vertical Y ≥4 horizontal):
+      │
+Frontend pide GET /api/usuarios/<id>/comparativa
+      │
+SaltoModel.obtener_por_usuario_y_tipo()  →  SELECT ... WHERE tipo_salto = ?
+      │
+comparativa_service.calcular_comparativa()  →  mejor/peor/media/último/evolución
+      │
+JSON con estadísticas por tipo
+```

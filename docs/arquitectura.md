@@ -24,6 +24,8 @@ Arduino (HC-SR04) → Serial USB (9600 baud) → Python MVC → Flask API → Fr
 
 ```
 Móvil (vídeo grabado) → Upload POST → MediaPipe PoseLandmarker → Cálculo híbrido (cinemática + calibración) → Flask API → JSON
+                                                                                                         ↕
+                                                                                              MySQL (usuarios + saltos)
 ```
 
 ## Capas
@@ -33,6 +35,7 @@ Móvil (vídeo grabado) → Upload POST → MediaPipe PoseLandmarker → Cálcul
 | Hardware | Arduino + HC-SR04 | Medir distancia física |
 | Visión artificial | MediaPipe + OpenCV | Analizar vídeo, detectar landmarks anatómicos de los pies |
 | Backend | Python + Flask | Leer serial / procesar vídeo, exponer API REST |
+| Base de datos | MySQL (InnoDB) | Persistencia de usuarios y saltos (tablas `usuarios` y `saltos`) |
 | Frontend (integración) | HTML / JS / CSS | Dashboard web unificado (mobile-first) |
 | Móvil (Fase 2) | Por definir | Grabar vídeo del salto y enviarlo al backend |
 
@@ -54,16 +57,38 @@ Cada módulo expone solo su API REST; no tiene frontend propio.
 
 ```
 modules/salto/backend/
-├── app.py                       ← Flask server (POST /api/salto/calcular)
-├── config.py                    ← Constantes (gravedad, landmarks, umbrales)
+├── app.py                       ← Flask server (rutas de salto + CRUD usuarios/saltos)
+├── config.py                    ← Constantes (gravedad, landmarks, umbrales, DB_CONFIG)
 ├── pose_landmarker_lite.task    ← Modelo MediaPipe
 ├── controllers/
-│   └── salto_controller.py      ← Orquesta procesamiento + cálculo
+│   ├── salto_controller.py      ← Orquesta procesamiento + cálculo
+│   ├── usuario_controller.py    ← CRUD usuarios + endpoints progreso/comparativa
+│   └── salto_db_controller.py   ← CRUD saltos en BD
 ├── models/
-│   └── video_processor.py       ← MediaPipe PoseLandmarker — extrae pies por frame
+│   ├── db.py                    ← Pool de conexiones MySQL (context manager)
+│   ├── video_processor.py       ← MediaPipe PoseLandmarker — extrae pies por frame
+│   ├── usuario_model.py         ← Queries tabla usuarios
+│   └── salto_model.py           ← Queries tabla saltos
 └── services/
-    └── calculo_service.py       ← Fórmulas cinemáticas puras
+    ├── calculo_service.py       ← Fórmulas cinemáticas puras
+    └── comparativa_service.py   ← Lógica de negocio: progreso (mín. 4+4) y comparativa
 ```
+
+### Base de datos — `bd_anim3d_saltos`
+
+```
+usuarios (1) ──────< (N) saltos
+   id_usuario PK            id_salto PK
+   alias UNIQUE             id_usuario FK → usuarios
+   nombre_completo          tipo_salto ENUM('vertical','horizontal')
+   altura_m DECIMAL(3,2)    distancia_cm INT
+   fecha_registro           tiempo_vuelo_s DECIMAL(5,3)
+                            confianza_ia DECIMAL(3,2)
+                            metodo_origen ENUM('ia_vivo','video_galeria','sensor_arduino')
+                            fecha_salto
+```
+
+Relación 1:N con `ON DELETE CASCADE`: al eliminar un usuario se eliminan todos sus saltos.
 
 ## Principios aplicados
 

@@ -165,3 +165,75 @@ Un vídeo corrupto o mal codificado puede reportar `fps=0` a través de
 OpenCV, lo que causaría divisiones por cero en los cálculos de tiempo  
 de vuelo. Se comprueba `fps <= 0` en `VideoProcessor.procesar()` y se  
 devuelve una lista vacía antes de procesar frames.
+
+---
+
+## Decisiones de la base de datos y reglas de negocio
+
+## MySQL con `mysql-connector-python` y pool de conexiones
+
+Se eligió MySQL (InnoDB) como SGBD relacional por su soporte nativo de  
+claves foráneas, transacciones ACID y `ON DELETE CASCADE`. La librería  
+`mysql-connector-python` es el conector oficial de Oracle, sin dependencias  
+externas en C.
+
+Se usa un **pool de 5 conexiones** (`MySQLConnectionPool`) con inicialización  
+lazy (se crea al primer uso). Un context manager (`get_connection()`) obtiene  
+una conexión del pool, hace commit automático al salir o rollback si hay  
+excepción, y devuelve la conexión al pool. Esto evita abrir/cerrar conexiones  
+en cada petición y elimina fugas de conexiones.
+
+## Queries parametrizadas (protección contra SQL injection)
+
+Todas las consultas usan `%s` como placeholder y pasan los valores como  
+tupla. MySQL Connector escapa automáticamente los parámetros, previniendo  
+inyección SQL en todos los endpoints.
+
+## Blueprints Flask para organizar rutas
+
+Los endpoints de usuarios y saltos se implementan como `Blueprint` de Flask,  
+registrados en `app.py`. Esto mantiene cada controller en su propio archivo  
+sin acoplar las rutas al punto de entrada principal.
+
+## Serialización de Decimal y datetime
+
+MySQL Connector devuelve columnas `DECIMAL` como `decimal.Decimal` y  
+columnas `DATETIME` como `datetime.datetime`, que no son serializables  
+por `json.dumps`. La función `_serializar()` en cada controller convierte  
+`Decimal` a `float` y `datetime` a cadena ISO 8601 antes de devolver JSON.
+
+## Guardado automático en BD desde el endpoint de cálculo
+
+El endpoint existente `POST /api/salto/calcular` acepta opcionalmente  
+`id_usuario` en el form-data. Si se proporciona y el cálculo tiene  
+resultado > 0, se persiste el salto automáticamente en la tabla `saltos`.  
+Si el guardado falla (ej. usuario inexistente, BD caída), se registra un  
+warning en log pero se devuelve el resultado igualmente — el cálculo  
+nunca falla por problemas de BD.
+
+## Regla de negocio: mínimo 4 saltos por tipo
+
+Se exige un mínimo de **4 saltos verticales y 4 saltos horizontales**  
+por usuario antes de poder acceder a la comparativa. Esta regla vive  
+en `comparativa_service.py` como constante `MINIMO_SALTOS_POR_TIPO = 4`,  
+no en la base de datos. Esto permite cambiar el mínimo sin alterar el  
+esquema SQL.
+
+El endpoint `/progreso` informa del estado actual sin restricción.  
+El endpoint `/comparativa` devuelve **403** si no se cumple el mínimo,  
+indicando cuántos saltos faltan por tipo.
+
+## Estadísticas calculadas al vuelo (sin tabla de caché)
+
+Las estadísticas de la comparativa (mejor, peor, media, último, evolución)  
+se calculan en Python cada vez que se consulta el endpoint. Con pocos  
+saltos por usuario (decenas, no miles), el coste es despreciable frente  
+a una consulta SQL. Esto evita mantener una tabla `estadisticas`  
+sincronizada y elimina el riesgo de datos obsoletos.
+
+## Comparativa intra-usuario (no ranking)
+
+La comparativa compara los saltos de un mismo usuario consigo mismo:  
+verticales con verticales, horizontales con horizontales. No hay  
+leaderboard ni ranking entre usuarios. Cada tipo de salto tiene sus  
+propias estadísticas independientes.

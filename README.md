@@ -20,6 +20,7 @@ Documentación detallada en [`docs/`](docs/).
 |--------|--------|-------------|
 | **Módulo 1 — Sensor Arduino** | ✅ Completado | Mide distancia con HC-SR04, expone los datos via API REST |
 | **Módulo 2 — Salto con móvil** | ✅ Backend completado | Analiza vídeo con MediaPipe, calcula salto vertical/horizontal |
+| **Base de datos** | ✅ Completada | MySQL — CRUD usuarios/saltos, progreso y comparativa |
 | **Integración web** | ✅ Completada | Frontend web unificado (landing + salto + sensor) |
 
 ---
@@ -55,13 +56,13 @@ proyecto-medicion/
 │   │
 │   └── salto/                   ← Módulo 2 (backend completado)
 │       ├── README.md
-│       ├── backend/             ← Python MVC + Flask API + MediaPipe
-│       │   ├── app.py           ← Entry point web (POST /api/salto/calcular)
-│       │   ├── config.py
+│       ├── backend/             ← Python MVC + Flask API + MediaPipe + MySQL
+│       │   ├── app.py           ← Entry point web (cálculo + CRUD usuarios/saltos)
+│       │   ├── config.py        ← Constantes + DB_CONFIG
 │       │   ├── pose_landmarker_lite.task
-│       │   ├── controllers/
-│       │   ├── models/
-│       │   └── services/
+│       │   ├── controllers/     ← salto_controller + usuario_controller + salto_db_controller
+│       │   ├── models/          ← video_processor + db + usuario_model + salto_model
+│       │   └── services/        ← calculo_service + comparativa_service
 │       └── mobile/              # Reservado — cliente móvil
 │
 ├── integration/
@@ -157,4 +158,4 @@ frontend/app.js       (Frontend)    — fetch cada 1 s → actualiza DOM
 | [docs/arquitectura.md](docs/arquitectura.md) | Diagrama de capas y tecnologías |
 | [docs/flujo_datos.md](docs/flujo_datos.md) | Paso a paso del dato desde el dispositivo al navegador |
 | [docs/fases_proyecto.md](docs/fases_proyecto.md) | Estado de cada fase del proyecto |
-| [docs/decisiones_tecnicas.md](docs/decisiones_tecnicas.md) | Justificaciones de diseño |
+| [docs/decisiones_tecnicas.md](docs/decisiones_tecnicas.md) | Justificaciones de diseño (hilos, locks, parseo, MVC, BD, reglas de negocio) |

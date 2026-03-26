@@ -28,5 +28,11 @@ Prerequisito: Fases 1 y 2 completadas.
 - [x] Script único de arranque (`scripts/run_all.bat`)
 - [x] Eliminados frontends individuales y scripts obsoletos
 - [ ] Decidir si se necesita `integration/backend/` (gateway/orquestador)
-- [ ] Histórico de mediciones (base de datos opcional)
+- [x] Base de datos MySQL — tablas `usuarios` y `saltos` (relación 1:N)
+- [x] CRUD REST para usuarios y saltos
+- [x] Persistencia automática del resultado de cálculo (si se envía `id_usuario`)
+- [x] Regla de negocio: mínimo 4 saltos verticales + 4 horizontales para comparativa
+- [x] Endpoint de progreso (`GET /api/usuarios/<id>/progreso`)
+- [x] Endpoint de comparativa (`GET /api/usuarios/<id>/comparativa`)
+- [x] Estadísticas calculadas al vuelo (mejor, peor, media, último, evolución)
 - [ ] Deploy o empaquetado final
