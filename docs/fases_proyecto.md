@@ -54,3 +54,45 @@ Prerequisito: Fases 1 y 2 completadas.
 - [ ] Autenticación de usuarios (JWT o sesiones)
 - [ ] Protección CSRF para endpoints de escritura
 - [ ] Rate limiting en endpoints POST/DELETE
+
+## Fase 5 — Biomecánica y análisis avanzado de saltos
+
+Prerequisito: Fase 2 completada (landmarks + historial de saltos en BD).
+
+### 5.1 Potencia de Sayers
+
+- [ ] Añadir campo `peso_kg` a tabla `usuarios` (ALTER TABLE, no destructivo)
+- [ ] Actualizar formulario de registro (frontend) con campo peso opcional
+- [ ] Actualizar endpoints POST/PUT de usuarios para aceptar `peso_kg`
+- [ ] Calcular potencia tras cada salto vertical: `P = 60.7 × h_cm + 45.3 × peso_kg − 2055`
+- [ ] Devolver `potencia_w` en la respuesta JSON del salto
+- [ ] Mostrar potencia en el panel de resultados del frontend
+
+### 5.2 Ángulos articulares en el despegue
+
+- [ ] Extraer landmarks de cadera (23/24), rodilla (25/26) y tobillo (27/28) en el frame de despegue
+- [ ] Calcular ángulo de rodilla: `θ = arctan2` entre vectores cadera→rodilla y tobillo→rodilla
+- [ ] Calcular ángulo de cadera: entre vectores hombro→cadera y rodilla→cadera
+- [ ] Crear `biomecanica_service.py` con funciones de trigonometría puras
+- [ ] Devolver `angulo_rodilla_deg` y `angulo_cadera_deg` en la respuesta JSON
+- [ ] Mostrar ángulos en panel de resultados (dato técnico adicional)
+
+### 5.3 Asimetría bilateral
+
+- [ ] Comparar desplazamiento Y del talón izquierdo vs derecho durante el despegue
+- [ ] Calcular índice de asimetría: `ASI = (|izq − der| / max(izq, der)) × 100`
+- [ ] Devolver `asimetria_pct` en la respuesta JSON del salto
+- [ ] Alerta visual si asimetría > 15% (indicador de riesgo de lesión)
+
+### 5.4 Detección de fatiga intra-sesión
+
+- [ ] Agrupar saltos por sesión (saltos del mismo usuario en un rango de 2 horas)
+- [ ] Calcular pendiente de regresión lineal sobre las distancias de la sesión
+- [ ] Endpoint `GET /api/usuarios/<id>/fatiga` que devuelva: pendiente, nº saltos, caída porcentual
+- [ ] Alerta en frontend si pendiente negativa significativa (>10% de caída)
+
+### 5.5 Curva de progresión con tendencia
+
+- [ ] Endpoint `GET /api/usuarios/<id>/tendencia?tipo=vertical` con regresión sobre historial completo
+- [ ] Devolver: pendiente (cm/semana), R², predicción a 4 semanas, estado (mejorando/estancado/empeorando)
+- [ ] Gráfica de evolución en frontend (canvas o librería ligera tipo Chart.js)

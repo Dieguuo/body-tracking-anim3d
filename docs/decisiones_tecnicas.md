@@ -290,3 +290,72 @@ El backend limita a 100 MB con `MAX_CONTENT_LENGTH`, pero sin validación
 cliente el usuario esperaría todo el upload para recibir un 413. Ahora
 `camara.js` comprueba `file.size` antes de enviar y muestra un aviso
 inmediato si se excede.
+
+---
+
+## Decisiones del módulo de biomecánica y análisis avanzado (Fase 5 — planificado)
+
+## Potencia de Sayers en vez de fuerza directa
+
+No se dispone de plataforma de fuerza, así que no se puede medir la
+potencia real de despegue. La **ecuación de Sayers (1999)** es la fórmula
+más utilizada en valoración deportiva para estimar la potencia pico de
+miembros inferiores a partir de la altura del salto vertical y el peso
+corporal:
+
+    P (W) = 60.7 × altura_cm + 45.3 × peso_kg − 2055
+
+Es un estándar reconocido en ciencias del deporte (validado contra
+plataformas de fuerza con R² > 0.88). Solo requiere añadir `peso_kg`
+al perfil del usuario — dato que ya se pide en muchas apps de fitness.
+
+## Ángulos articulares por trigonometría de landmarks
+
+MediaPipe ya devuelve landmarks de cadera (23/24), rodilla (25/26) y
+tobillo (27/28). El ángulo de una articulación se calcula como el ángulo
+entre los dos segmentos que la forman, usando `arctan2` sobre el producto
+vectorial y el producto escalar:
+
+    θ = arctan2(|a × b|, a · b)
+
+donde `a` = vector proximal→articulación y `b` = vector distal→articulación.
+
+Se extraen en el frame de despegue (ya detectado por `_detectar_vuelo`).
+No requiere modelo de IA adicional — es geometría pura sobre datos que
+ya se procesan.
+
+## Índice de asimetría bilateral (ASI)
+
+El ASI compara la contribución de cada pierna al salto:
+
+    ASI = (|izq − der| / max(izq, der)) × 100
+
+Un ASI > 15% es un indicador reconocido de riesgo de lesión en la
+literatura de biomecánica deportiva. Los datos ya están disponibles en
+`FramePies` (talon_izq_y / talon_der_y), solo falta compararlos en el
+frame de despegue.
+
+## Detección de fatiga por pendiente de regresión
+
+Si un jugador hace múltiples saltos en una sesión y los últimos producen
+distancias significativamente menores, hay fatiga neuromuscular. Se
+detecta calculando la pendiente de regresión lineal sobre las distancias
+ordenadas cronológicamente. Una caída > 10% respecto al primer salto
+de la sesión se considera significativa.
+
+La agrupación en "sesión" se hace por ventana temporal (saltos del mismo
+usuario en un rango de 2 horas), sin necesidad de que el usuario abra/
+cierre sesión explícitamente.
+
+## Curva de progresión con regresión temporal
+
+Para responder "¿estoy mejorando?", se calcula una regresión lineal de
+distancia sobre el tiempo (semanas) usando el historial completo del
+usuario, separado por tipo de salto. Se devuelven:
+
+- **Pendiente** (cm/semana): ritmo de mejora positivo o negativo
+- **R²**: fiabilidad de la tendencia (>0.5 = tendencia clara)
+- **Estado**: mejorando / estancado / empeorando (basado en pendiente + R²)
+
+Esto no requiere librerías adicionales — `numpy.polyfit(x, y, 1)` es
+suficiente para regresión lineal.
