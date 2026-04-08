@@ -10,6 +10,8 @@ Rutas:
     GET    /api/usuarios/<id>/saltos      → Saltos de un usuario
     GET    /api/usuarios/<id>/progreso    → Progreso (mínimo 4+4)
     GET    /api/usuarios/<id>/comparativa → Comparativa intra-usuario
+    GET    /api/usuarios/<id>/fatiga      → Fatiga intra-sesión
+    GET    /api/usuarios/<id>/tendencia   → Tendencia histórica
 """
 
 from flask import Blueprint, jsonify, request
@@ -18,11 +20,23 @@ from mysql.connector import IntegrityError
 from models.usuario_model import UsuarioModel
 from models.salto_model import SaltoModel
 from services.comparativa_service import calcular_progreso, calcular_comparativa
+from services.analitica_service import (
+    TIPOS_SALTO_VALIDOS,
+    calcular_fatiga_intra_sesion,
+    calcular_tendencia_historial,
+)
 
 usuarios_bp = Blueprint("usuarios", __name__)
 
 _usuario_model = UsuarioModel()
 _salto_model = SaltoModel()
+
+
+def _leer_tipo_salto(default: str = "vertical"):
+    tipo = (request.args.get("tipo") or default).strip().lower()
+    if tipo not in TIPOS_SALTO_VALIDOS:
+        return None, jsonify({"error": f"tipo debe ser: {', '.join(sorted(TIPOS_SALTO_VALIDOS))}"}), 400
+    return tipo, None, None
 
 
 def _serializar(row: dict) -> dict:
@@ -184,3 +198,45 @@ def comparativa(id_usuario):
         }), 403
 
     return jsonify(resultado)
+
+
+@usuarios_bp.route("/api/usuarios/<int:id_usuario>/fatiga", methods=["GET"])
+def fatiga(id_usuario):
+    usuario = _usuario_model.obtener_por_id(id_usuario)
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    tipo, error_response, status = _leer_tipo_salto(default="vertical")
+    if error_response:
+        return error_response, status
+
+    saltos = _salto_model.obtener_por_usuario_y_tipo(id_usuario, tipo)
+    resultado = calcular_fatiga_intra_sesion(saltos)
+
+    return jsonify({
+        "id_usuario": id_usuario,
+        "alias": usuario["alias"],
+        "tipo_salto": tipo,
+        **resultado,
+    })
+
+
+@usuarios_bp.route("/api/usuarios/<int:id_usuario>/tendencia", methods=["GET"])
+def tendencia(id_usuario):
+    usuario = _usuario_model.obtener_por_id(id_usuario)
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    tipo, error_response, status = _leer_tipo_salto(default="vertical")
+    if error_response:
+        return error_response, status
+
+    saltos = _salto_model.obtener_por_usuario_y_tipo(id_usuario, tipo)
+    resultado = calcular_tendencia_historial(saltos)
+
+    return jsonify({
+        "id_usuario": id_usuario,
+        "alias": usuario["alias"],
+        "tipo_salto": tipo,
+        **resultado,
+    })

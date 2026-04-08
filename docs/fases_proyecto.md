@@ -86,13 +86,13 @@ Prerequisito: Fase 2 completada (landmarks + historial de saltos en BD).
 
 ### 5.4 Detección de fatiga intra-sesión
 
-- [ ] Agrupar saltos por sesión (saltos del mismo usuario en un rango de 2 horas)
-- [ ] Calcular pendiente de regresión lineal sobre las distancias de la sesión
-- [ ] Endpoint `GET /api/usuarios/<id>/fatiga` que devuelva: pendiente, nº saltos, caída porcentual
-- [ ] Alerta en frontend si pendiente negativa significativa (>10% de caída)
+- [x] Agrupar saltos por sesión (saltos del mismo usuario en un rango de 2 horas)
+- [x] Calcular pendiente de regresión lineal sobre las distancias de la sesión
+- [x] Endpoint `GET /api/usuarios/<id>/fatiga` que devuelva: pendiente, nº saltos, caída porcentual
+- [x] Alerta en frontend si pendiente negativa significativa (>10% de caída)
 
 ### 5.5 Curva de progresión con tendencia
 
-- [ ] Endpoint `GET /api/usuarios/<id>/tendencia?tipo=vertical` con regresión sobre historial completo
-- [ ] Devolver: pendiente (cm/semana), R², predicción a 4 semanas, estado (mejorando/estancado/empeorando)
-- [ ] Gráfica de evolución en frontend (canvas o librería ligera tipo Chart.js)
+- [x] Endpoint `GET /api/usuarios/<id>/tendencia?tipo=vertical` con regresión sobre historial completo
+- [x] Devolver: pendiente (cm/semana), R², predicción a 4 semanas, estado (mejorando/estancado/empeorando)
+- [x] Gráfica de evolución en frontend (canvas o librería ligera tipo Chart.js)

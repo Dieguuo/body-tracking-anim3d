@@ -301,6 +301,7 @@ body {
     width: 100%;
     max-width: 500px;
     margin: 0 auto;
+    overflow-y: auto;
 }
 
 .user-panel {
@@ -312,6 +313,88 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+}
+
+.analitica-panel {
+    margin-top: 0.35rem;
+    width: 100%;
+    border: 1px solid rgba(203, 156, 255, 0.28);
+    background: rgba(111, 56, 183, 0.08);
+    border-radius: 14px;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.analitica-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.analitica-titulo {
+    font-size: 0.95rem;
+    color: #d7b9f3;
+}
+
+.analitica-refresh {
+    height: 34px !important;
+    width: auto !important;
+    min-width: 110px;
+    border-radius: 10px;
+    font-size: 0.83rem !important;
+}
+
+.fatiga-alerta {
+    border-radius: 10px;
+    border: 1px solid rgba(248, 118, 135, 0.55);
+    background: rgba(187, 62, 77, 0.2);
+    color: #ffc3cc;
+    font-size: 0.84rem;
+    line-height: 1.35;
+    padding: 0.6rem 0.65rem;
+}
+
+.analitica-metricas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
+}
+
+.metrica-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.5rem 0.55rem;
+}
+
+.metrica-label {
+    font-size: 0.73rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
+}
+
+.metrica-item strong {
+    font-size: 0.92rem;
+    color: #ffffff;
+}
+
+.analitica-grafica-wrap {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.18);
+    padding: 0.45rem;
+}
+
+.analitica-grafica-wrap canvas {
+    width: 100% !important;
 }
 
 .panel-title {
