@@ -61,12 +61,12 @@ Prerequisito: Fase 2 completada (landmarks + historial de saltos en BD).
 
 ### 5.1 Potencia de Sayers
 
-- [ ] Añadir campo `peso_kg` a tabla `usuarios` (ALTER TABLE, no destructivo)
-- [ ] Actualizar formulario de registro (frontend) con campo peso opcional
-- [ ] Actualizar endpoints POST/PUT de usuarios para aceptar `peso_kg`
-- [ ] Calcular potencia tras cada salto vertical: `P = 60.7 × h_cm + 45.3 × peso_kg − 2055`
-- [ ] Devolver `potencia_w` en la respuesta JSON del salto
-- [ ] Mostrar potencia en el panel de resultados del frontend
+- [x] Añadir campo `peso_kg` a tabla `usuarios` (ALTER TABLE, no destructivo)
+- [x] Actualizar formulario de registro (frontend) con campo peso opcional
+- [x] Actualizar endpoints POST/PUT de usuarios para aceptar `peso_kg`
+- [x] Calcular potencia tras cada salto vertical: `P = 60.7 × h_cm + 45.3 × peso_kg − 2055`
+- [x] Devolver `potencia_w` en la respuesta JSON del salto
+- [x] Mostrar potencia en el panel de resultados del frontend
 
 ### 5.2 Ángulos articulares en el despegue
 
@@ -79,10 +79,10 @@ Prerequisito: Fase 2 completada (landmarks + historial de saltos en BD).
 
 ### 5.3 Asimetría bilateral
 
-- [ ] Comparar desplazamiento Y del talón izquierdo vs derecho durante el despegue
-- [ ] Calcular índice de asimetría: `ASI = (|izq − der| / max(izq, der)) × 100`
-- [ ] Devolver `asimetria_pct` en la respuesta JSON del salto
-- [ ] Alerta visual si asimetría > 15% (indicador de riesgo de lesión)
+- [x] Comparar desplazamiento Y del talón izquierdo vs derecho durante el despegue
+- [x] Calcular índice de asimetría: `ASI = (|izq − der| / max(izq, der)) × 100`
+- [x] Devolver `asimetria_pct` en la respuesta JSON del salto
+- [x] Alerta visual si asimetría > 15% (indicador de riesgo de lesión)
 
 ### 5.4 Detección de fatiga intra-sesión
 

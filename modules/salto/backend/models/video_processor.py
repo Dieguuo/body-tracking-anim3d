@@ -1,5 +1,5 @@
 """
-MODEL — Procesador de vídeo con MediaPipe PoseLandmarker (Tasks API).
+MODELO — Procesador de vídeo con MediaPipe PoseLandmarker (Tasks API).
 
 Lee un vídeo fotograma a fotograma, detecta los landmarks anatómicos
 y devuelve las coordenadas de los pies en cada frame.
@@ -78,7 +78,7 @@ class InfoVideo:
 
 class VideoProcessor:
     """
-    MODEL — Procesa un archivo de vídeo y extrae las coordenadas de los pies
+    MODELO — Procesa un archivo de vídeo y extrae las coordenadas de los pies
     fotograma a fotograma mediante MediaPipe PoseLandmarker.
 
     Se crea un nuevo PoseLandmarker por cada llamada a procesar() para

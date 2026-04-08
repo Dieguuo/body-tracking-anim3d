@@ -177,7 +177,7 @@ claves foráneas, transacciones ACID y `ON DELETE CASCADE`. La librería
 `mysql-connector-python` es el conector oficial de Oracle, sin dependencias  
 externas en C.
 
-Se usa un **pool de 5 conexiones** (`MySQLConnectionPool`) con inicialización  
+Se usa un **pool de 10 conexiones** (`MySQLConnectionPool`) con inicialización  
 lazy (se crea al primer uso). Un context manager (`get_connection()`) obtiene  
 una conexión del pool, hace commit automático al salir o rollback si hay  
 excepción, y devuelve la conexión al pool. Esto evita abrir/cerrar conexiones  
@@ -293,7 +293,7 @@ inmediato si se excede.
 
 ---
 
-## Decisiones del módulo de biomecánica y análisis avanzado (Fase 5 — planificado)
+## Decisiones del módulo de biomecánica y análisis avanzado (Fase 5)
 
 ## Potencia de Sayers en vez de fuerza directa
 
@@ -308,6 +308,20 @@ corporal:
 Es un estándar reconocido en ciencias del deporte (validado contra
 plataformas de fuerza con R² > 0.88). Solo requiere añadir `peso_kg`
 al perfil del usuario — dato que ya se pide en muchas apps de fitness.
+El campo es opcional (`DECIMAL(5,1) NULL`); si no está informado, la
+respuesta del salto devuelve `potencia_w: null`.
+
+## Asimetría bilateral por desplazamiento de talones
+
+Se compara el desplazamiento vertical del talón izquierdo frente al
+derecho en el frame de despegue, usando el frame 0 como referencia
+de reposo. El índice ASI (Asymmetry Symmetry Index) se calcula como:
+
+    ASI = (|izq − der| / max(izq, der)) × 100
+
+Un valor > 15 % se señala con alerta visual en el frontend como
+indicador de riesgo de lesión. Los datos de talón izquierdo/derecho
+ya están disponibles en `FramePies` (landmarks 29/30 de MediaPipe).
 
 ## Ángulos articulares por trigonometría de landmarks
 

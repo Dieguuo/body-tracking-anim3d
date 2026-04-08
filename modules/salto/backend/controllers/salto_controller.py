@@ -1,5 +1,5 @@
 """
-CONTROLLER — Orquesta el procesamiento de vídeo y el cálculo del salto.
+CONTROLADOR — Orquesta el procesamiento de vídeo y el cálculo del salto.
 
 Recibe la ruta del vídeo y los parámetros, coordina modelo y servicio,
 y devuelve el resultado final.
@@ -11,10 +11,10 @@ from services.calculo_service import CalculoService, ResultadoSalto
 
 class SaltoController:
     """
-    CONTROLLER — Flujo principal:
+    CONTROLADOR — Flujo principal:
       1. Validar archivo de vídeo
-      2. Procesar con MediaPipe (Model)
-      3. Calcular distancia (Service)
+      2. Procesar con MediaPipe (Modelo)
+      3. Calcular distancia (Servicio)
       4. Devolver resultado
     """
 
@@ -27,6 +27,7 @@ class SaltoController:
         ruta_video: str,
         tipo_salto: str,
         altura_real_m: float | None = None,
+        peso_kg: float | None = None,
     ) -> ResultadoSalto:
         """
         Punto de entrada principal.
@@ -39,7 +40,7 @@ class SaltoController:
         Returns:
             ResultadoSalto con la distancia calculada.
         """
-        # Procesar vídeo (Model)
+        # Procesar vídeo (Modelo)
         frames, info = self.processor.procesar(ruta_video)
 
         if not frames or info is None:
@@ -52,6 +53,6 @@ class SaltoController:
         if tipo_salto == "horizontal":
             return self.calculo.calcular_horizontal(frames, info.fps, altura_real_m)
 
-        return self.calculo.calcular_vertical(frames, info.fps, altura_real_m)
+        return self.calculo.calcular_vertical(frames, info.fps, altura_real_m, peso_kg)
 
 

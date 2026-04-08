@@ -1,5 +1,5 @@
 """
-SERVICE — Lógica de negocio para progreso y comparativa de saltos.
+SERVICIO — Lógica de negocio para progreso y comparativa de saltos.
 
 Regla de negocio: mínimo 4 saltos verticales y 4 horizontales
 para poder acceder a la comparativa.

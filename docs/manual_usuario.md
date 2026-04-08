@@ -89,10 +89,10 @@ Analiza un vídeo de salto (vertical u horizontal) y calcula la distancia recorr
   - **Salto Horizontal** — para saltos de longitud
   - **Salto Vertical** — para saltos de altura
 
-#### 2. Introducir tu altura
+#### 2. Introducir tu altura y peso
 
-- En el campo **"Altura (ej: 1.75)"**, escribir tu estatura en metros.
-- Este dato es **obligatorio** y se usa para calibrar la medición.
+- En el campo **"Altura (ej: 1.75)"**, escribir tu estatura en metros. Este dato es **obligatorio** y se usa para calibrar la medición.
+- En el campo **"Peso kg (opcional)"**, introducir tu peso corporal. Es opcional, pero si se rellena permite calcular la **potencia pico** del salto (ecuación de Sayers).
 
 #### 3. Grabar o subir el vídeo
 
@@ -121,6 +121,10 @@ Tras el análisis aparece un panel de resultados con:
 | **Tiempo Vuelo** | Segundos que el sujeto estuvo en el aire |
 | **F. Despegue** | Número de frame donde se detectó el despegue |
 | **F. Aterrizaje** | Número de frame donde se detectó el aterrizaje |
+| **Áng. Rodilla** | Ángulo de la rodilla en el frame de despegue (grados) |
+| **Áng. Cadera** | Ángulo de la cadera en el frame de despegue (grados) |
+| **Potencia** | Potencia pico estimada en watts (requiere peso del usuario) |
+| **Asimetría** | Índice de asimetría bilateral (%). Rojo si > 15 % |
 
 #### 5. Repetir
 
@@ -211,7 +215,7 @@ El backend del módulo salto (puerto 5001) expone, además del endpoint de cálc
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `GET` | `/api/usuarios` | Lista todos los usuarios |
-| `POST` | `/api/usuarios` | Crea un usuario (JSON: `alias`, `nombre_completo`, `altura_m`) |
+| `POST` | `/api/usuarios` | Crea un usuario (JSON: `alias`, `nombre_completo`, `altura_m`, `peso_kg` opcional) |
 | `GET` | `/api/usuarios/<id>` | Obtiene un usuario por ID |
 | `PUT` | `/api/usuarios/<id>` | Actualiza un usuario (JSON: mismos campos) |
 | `DELETE` | `/api/usuarios/<id>` | Elimina un usuario y todos sus saltos (CASCADE) |
@@ -242,6 +246,7 @@ El endpoint `POST /api/salto/calcular` acepta opcionalmente:
 |-------|------|-------------|
 | `id_usuario` | int | Si se envía, el resultado se guarda automáticamente en BD |
 | `metodo_origen` | string | `"ia_vivo"`, `"video_galeria"` o `"sensor_arduino"` (por defecto: `video_galeria`) |
+| `guardar_video_bd` | bool | Si es `true` y se guarda salto, persiste el vídeo en BD |
 
 La respuesta incluirá `id_salto` si el guardado fue exitoso.
 
@@ -249,7 +254,16 @@ La respuesta incluirá `id_salto` si el guardado fue exitoso.
 
 MySQL con base de datos `bd_anim3d_saltos`. Dos tablas:
 
-- **`usuarios`** — `id_usuario`, `alias` (UNIQUE), `nombre_completo`, `altura_m`, `fecha_registro`
-- **`saltos`** — `id_salto`, `id_usuario` (FK), `tipo_salto`, `distancia_cm`, `tiempo_vuelo_s`, `confianza_ia`, `metodo_origen`, `fecha_salto`
+- **`usuarios`** — `id_usuario`, `alias` (UNIQUE), `nombre_completo`, `altura_m`, `peso_kg`, `fecha_registro`
+- **`saltos`** — `id_salto`, `id_usuario` (FK), `tipo_salto`, `distancia_cm`, `tiempo_vuelo_s`, `confianza_ia`, `metodo_origen`, `fecha_salto`, `video_blob`, `video_nombre`, `video_mime`
 
 La conexión se configura en `modules/salto/backend/config.py` (`DB_CONFIG`).
+
+### 8.6 Analítica avanzada
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/api/usuarios/<id>/fatiga?tipo=vertical` | Fatiga intra-sesión: pendiente, nº saltos, caída %, alerta si >10 % |
+| `GET` | `/api/usuarios/<id>/tendencia?tipo=vertical` | Tendencia histórica: pendiente cm/semana, R², predicción 4 semanas, estado (mejorando/estancado/empeorando) |
+
+Ambos endpoints aceptan `?tipo=vertical` o `?tipo=horizontal` (por defecto: `vertical`).

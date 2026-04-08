@@ -5,6 +5,7 @@ function setUsuarioActivo(usuario) {
     sessionStorage.setItem('aliasUser', usuario.alias);
     sessionStorage.setItem('nombreUser', usuario.nombre_completo);
     sessionStorage.setItem('alturaUser', String(usuario.altura_m));
+    sessionStorage.setItem('pesoUser', usuario.peso_kg != null ? String(usuario.peso_kg) : '');
 
     const alturaInput = document.getElementById('altura-usuario');
     if (alturaInput) {
@@ -27,6 +28,7 @@ function limpiarUsuarioActivo(mensaje = 'Sin usuario activo.') {
     sessionStorage.removeItem('aliasUser');
     sessionStorage.removeItem('nombreUser');
     sessionStorage.removeItem('alturaUser');
+    sessionStorage.removeItem('pesoUser');
 
     const alturaInput = document.getElementById('altura-usuario');
     if (alturaInput) {
@@ -73,31 +75,35 @@ async function fetchJson(url, options = {}) {
     return payload;
 }
 
-async function crearUsuario(alias, nombreCompleto, alturaM) {
+async function crearUsuario(alias, nombreCompleto, alturaM, pesoKg) {
     const url = `${getBackendBaseUrl()}/api/usuarios`;
+    const body = {
+        alias: alias,
+        nombre_completo: nombreCompleto,
+        altura_m: alturaM
+    };
+    if (pesoKg != null && pesoKg !== '') body.peso_kg = pesoKg;
     const payload = await fetchJson(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            alias: alias,
-            nombre_completo: nombreCompleto,
-            altura_m: alturaM
-        })
+        body: JSON.stringify(body)
     });
 
     return payload.id_usuario;
 }
 
-async function actualizarUsuario(idUsuario, alias, nombreCompleto, alturaM) {
+async function actualizarUsuario(idUsuario, alias, nombreCompleto, alturaM, pesoKg) {
     const url = `${getBackendBaseUrl()}/api/usuarios/${idUsuario}`;
+    const body = {
+        alias: alias,
+        nombre_completo: nombreCompleto,
+        altura_m: alturaM
+    };
+    if (pesoKg != null && pesoKg !== '') body.peso_kg = pesoKg;
     await fetchJson(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            alias: alias,
-            nombre_completo: nombreCompleto,
-            altura_m: alturaM
-        })
+        body: JSON.stringify(body)
     });
 }
 
@@ -217,6 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputAlias = document.getElementById('nuevo-alias');
     const inputNombre = document.getElementById('nuevo-nombre');
     const inputAltura = document.getElementById('nuevo-altura');
+    const inputPeso = document.getElementById('nuevo-peso');
 
     const PAGE_SIZE = 20;
     let usuariosOffset = 0;
@@ -239,6 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (inputAlias) inputAlias.value = '';
         if (inputNombre) inputNombre.value = '';
         if (inputAltura) inputAltura.value = '';
+        if (inputPeso) inputPeso.value = '';
     }
 
     function activarModoEdicion(usuario) {
@@ -249,6 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
         inputAlias.value = usuario.alias || '';
         inputNombre.value = usuario.nombre_completo || '';
         inputAltura.value = String(usuario.altura_m ?? '');
+        if (inputPeso) inputPeso.value = usuario.peso_kg != null ? String(usuario.peso_kg) : '';
         btnCrearInline.textContent = 'Guardar cambios';
         btnCancelarEdicion.style.display = 'block';
         setEstado(`Editando usuario: ${usuario.alias}`, '#c897ff');
@@ -294,7 +303,9 @@ document.addEventListener('DOMContentLoaded', () => {
         tdNombre.textContent = u.nombre_completo || '';
         const tdEdad = document.createElement('td');
         tdEdad.textContent = obtenerEdadTexto(u);
-        tr.append(tdAlias, tdNombre, tdEdad);
+        const tdPeso = document.createElement('td');
+        tdPeso.textContent = u.peso_kg != null ? `${u.peso_kg} kg` : '-';
+        tr.append(tdAlias, tdNombre, tdEdad, tdPeso);
 
         tr.addEventListener('click', () => {
             usuarioActivoId = Number(u.id_usuario);
@@ -452,6 +463,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const alias = (inputAlias?.value || '').trim();
             const nombre = (inputNombre?.value || '').trim();
             const altura = parseFloat(inputAltura?.value || '0');
+            const pesoRaw = (inputPeso?.value || '').trim();
+            const peso = pesoRaw ? parseFloat(pesoRaw) : null;
 
             if (!alias || !nombre || !(altura > 0)) {
                 setEstado('Completa alias, nombre y altura.', '#ffb020');
@@ -463,16 +476,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            if (peso !== null && (peso < 20 || peso > 300)) {
+                setEstado('El peso debe estar entre 20 y 300 kg.', '#ffb020');
+                return;
+            }
+
             btnCrearInline.disabled = true;
             const texto = btnCrearInline.textContent;
             const eraEdicion = modoEdicion;
             btnCrearInline.textContent = modoEdicion ? 'Guardando...' : 'Creando...';
             try {
                 if (modoEdicion && usuarioActivoData) {
-                    await actualizarUsuario(usuarioActivoData.id_usuario, alias, nombre, altura);
+                    await actualizarUsuario(usuarioActivoData.id_usuario, alias, nombre, altura, peso);
                     usuarioActivoId = usuarioActivoData.id_usuario;
                 } else {
-                    const idUsuario = await crearUsuario(alias, nombre, altura);
+                    const idUsuario = await crearUsuario(alias, nombre, altura, peso);
                     usuarioActivoId = idUsuario;
                 }
 
@@ -483,7 +501,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     id_usuario: idFinal,
                     alias,
                     nombre_completo: nombre,
-                    altura_m: altura
+                    altura_m: altura,
+                    peso_kg: peso
                 };
                 usuarioActivoData = usuarioFinal;
 
@@ -491,7 +510,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     id_usuario: idFinal,
                     alias,
                     nombre_completo: nombre,
-                    altura_m: altura
+                    altura_m: altura,
+                    peso_kg: peso
                 });
 
                 desactivarModoEdicion();

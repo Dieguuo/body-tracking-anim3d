@@ -45,7 +45,7 @@
 5. **`SaltoController.procesar_salto()`** (Controller) orquesta modelo y servicio, validando los datos de entrada.
 6. **Flask `POST /api/salto/calcular`** devuelve JSON:
    ```json
-   { "tipo_salto": "vertical", "distancia": 34.12, "unidad": "cm", "confianza": 0.98, "frame_despegue": 42, "frame_aterrizaje": 58, "tiempo_vuelo_s": 0.5333, "metodo": "hibrido", "dist_por_pixeles": 36.45, "dist_por_cinematica": 30.67 }
+   { "tipo_salto": "vertical", "distancia": 34.12, "unidad": "cm", "confianza": 0.98, "frame_despegue": 42, "frame_aterrizaje": 58, "tiempo_vuelo_s": 0.5333, "angulo_rodilla_deg": 162.3, "angulo_cadera_deg": 171.5, "potencia_w": 3182.5, "asimetria_pct": 8.3, "metodo": "hibrido", "dist_por_pixeles": 36.45, "dist_por_cinematica": 30.67 }
    ```
 7. Si se envió `id_usuario` en la petición, el resultado se **persiste automáticamente** en la tabla `saltos` de MySQL y la respuesta incluye `id_salto`.
 8. El archivo de vídeo temporal se **elimina automáticamente** tras el procesamiento.
@@ -56,7 +56,7 @@
 
 ### Paso a paso
 
-1. **`POST /api/usuarios`** recibe JSON con `alias`, `nombre_completo`, `altura_m`.
+1. **`POST /api/usuarios`** recibe JSON con `alias`, `nombre_completo`, `altura_m` y opcionalmente `peso_kg`.
 2. **`UsuarioModel.crear()`** ejecuta un INSERT parametrizado en la tabla `usuarios`.
 3. El pool de conexiones (`db.py`) obtiene una conexión, ejecuta la query, hace commit y devuelve la conexión al pool.
 4. El usuario puede registrar saltos manualmente (`POST /api/saltos`) o automáticamente (al calcular vía vídeo con `id_usuario`).
@@ -79,4 +79,42 @@ SaltoModel.obtener_por_usuario_y_tipo()  →  SELECT ... WHERE tipo_salto = ?
 comparativa_service.calcular_comparativa()  →  mejor/peor/media/último/evolución
       │
 JSON con estadísticas por tipo
+```
+
+---
+
+## Módulo 2 — Analítica avanzada (fatiga y tendencia)
+
+### Fatiga intra-sesión
+
+```
+Frontend pide GET /api/usuarios/<id>/fatiga?tipo=vertical
+      │
+SaltoModel.obtener_por_usuario_y_tipo()  →  SELECT ... WHERE tipo_salto = ?
+      │
+analitica_service.calcular_fatiga_intra_sesion()
+      │
+  1. Agrupa saltos por sesión (separación máxima de 2 h entre consecutivos)
+  2. Toma la sesión más reciente
+  3. Regresión lineal sobre las distancias
+  4. Calcula caída porcentual (primer salto vs último)
+      │
+JSON: pendiente, numero_saltos, caida_porcentual, fatiga_significativa, sesion
+```
+
+### Tendencia histórica
+
+```
+Frontend pide GET /api/usuarios/<id>/tendencia?tipo=vertical
+      │
+SaltoModel.obtener_por_usuario_y_tipo()  →  SELECT ... WHERE tipo_salto = ?
+      │
+analitica_service.calcular_tendencia_historial()
+      │
+  1. Convierte fechas a semanas desde el primer salto
+  2. Regresión lineal sobre todo el historial
+  3. Calcula pendiente (cm/semana), R² y predicción a 4 semanas
+  4. Clasifica estado: mejorando / estancado / empeorando
+      │
+JSON: pendiente_cm_semana, r2, prediccion_4_semanas, estado, historial[]
 ```

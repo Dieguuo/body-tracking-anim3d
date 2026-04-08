@@ -72,6 +72,7 @@
                             <th>Alias</th>
                             <th>Nombre</th>
                             <th>Altura</th>
+                            <th>Peso</th>
                         </tr>
                     </thead>
                     <tbody id="tabla-usuarios-body"></tbody>
@@ -90,8 +91,9 @@
 
             <div class="form-inline-usuario">
                 <input type="text" id="nuevo-alias" class="modern-input" placeholder="Alias" maxlength="50">
-                <input type="text" id="nuevo-nombre" class="modern-input" placeholder="Nombre completo" maxlength="100">
+                <input type="text" id="nuevo-nombre" class="modern-input" placeholder="Nombre completo" maxlength="120">
                 <input type="number" id="nuevo-altura" class="modern-input" placeholder="Altura (1.75)" step="0.01" min="0.5" max="2.5">
+                <input type="number" id="nuevo-peso" class="modern-input" placeholder="Peso kg (opcional)" step="0.1" min="20" max="300">
                 <button id="btn-crear-usuario-inline" class="sensor-btn secondary-btn" type="button">Crear usuario</button>
                 <button id="btn-cancelar-edicion" class="sensor-btn ghost-btn" type="button" style="display:none;">Cancelar edición</button>
             </div>
@@ -173,6 +175,14 @@
                 <div class="data-box">
                     <span class="data-label">Ang. Cadera</span>
                     <span id="data-angulo-cadera" class="data-value">-- deg</span>
+                </div>
+                <div class="data-box">
+                    <span class="data-label">Potencia</span>
+                    <span id="data-potencia" class="data-value">-- W</span>
+                </div>
+                <div class="data-box">
+                    <span class="data-label">Asimetría</span>
+                    <span id="data-asimetria" class="data-value">-- %</span>
                 </div>
             </div>
 

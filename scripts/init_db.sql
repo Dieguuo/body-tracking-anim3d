@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     alias       VARCHAR(50)   NOT NULL UNIQUE,
     nombre_completo VARCHAR(120) NOT NULL,
     altura_m    DECIMAL(4,2)  NOT NULL,
+    peso_kg     DECIMAL(5,1)  NULL,
     fecha_registro DATETIME   DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -44,3 +45,16 @@ CREATE TABLE IF NOT EXISTS saltos (
 -- ── Índice para consultas por usuario ──
 
 CREATE INDEX IF NOT EXISTS idx_saltos_usuario ON saltos(id_usuario);
+
+-- ── Migración: añadir peso_kg si no existe (entornos ya desplegados) ──
+
+SET @col_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = 'bd_anim3d_saltos' AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'peso_kg');
+
+SET @sql = IF(@col_exists = 0,
+    'ALTER TABLE usuarios ADD COLUMN peso_kg DECIMAL(5,1) NULL AFTER altura_m',
+    'SELECT 1');
+
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

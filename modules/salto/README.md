@@ -23,6 +23,8 @@ salto/
 │   │   └── salto_model.py           ← Queries tabla saltos
 │   ├── services/
 │   │   ├── calculo_service.py       ← Fórmulas: vertical (híbrido cinemática + calibración) + horizontal (calibración)
+│   │   ├── biomecanica_service.py   ← Trigonometría pura para ángulos articulares
+│   │   ├── analitica_service.py     ← Fatiga intra-sesión + tendencia histórica
 │   │   └── comparativa_service.py   ← Lógica de negocio: progreso (mín. 4+4) y estadísticas
 │   └── uploads/                     ← Vídeos temporales (auto-limpieza)
 ├── mobile/                          # Reservado — cliente móvil (Fase 2)
@@ -57,6 +59,7 @@ Content-Type: multipart/form-data
 | `altura_real_m` | float | Siempre | Altura real del usuario en metros (ej. `1.75`). Necesaria para calibrar la conversión píxel → metro. |
 | `id_usuario` | int | Opcional | Si se envía, el resultado se guarda automáticamente en BD |
 | `metodo_origen` | string | Opcional | `"ia_vivo"`, `"video_galeria"` o `"sensor_arduino"` (default: `video_galeria`) |
+| `guardar_video_bd` | bool | Opcional | Si es `true` y se guarda salto, persiste el vídeo en BD |
 
 **Respuesta JSON:**
 
@@ -69,6 +72,10 @@ Content-Type: multipart/form-data
   "frame_despegue": 42,
   "frame_aterrizaje": 58,
   "tiempo_vuelo_s": 0.5333,
+  "angulo_rodilla_deg": 162.3,
+  "angulo_cadera_deg": 171.5,
+  "potencia_w": 3182.5,
+  "asimetria_pct": 8.3,
   "metodo": "hibrido",
   "dist_por_pixeles": 36.45,
   "dist_por_cinematica": 30.67
@@ -99,7 +106,7 @@ Flask app.py          (API)         — POST /api/salto/calcular → JSON
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `GET` | `/api/usuarios` | Lista todos |
-| `POST` | `/api/usuarios` | Crea (JSON: `alias`, `nombre_completo`, `altura_m`) |
+| `POST` | `/api/usuarios` | Crea (JSON: `alias`, `nombre_completo`, `altura_m`, `peso_kg` opcional) |
 | `GET` | `/api/usuarios/<id>` | Obtiene por ID |
 | `PUT` | `/api/usuarios/<id>` | Actualiza |
 | `DELETE` | `/api/usuarios/<id>` | Elimina (CASCADE a saltos) |
@@ -111,6 +118,7 @@ Flask app.py          (API)         — POST /api/salto/calcular → JSON
 | `GET` | `/api/saltos` | Lista todos |
 | `POST` | `/api/saltos` | Registra manualmente (JSON: `id_usuario`, `tipo_salto`, `distancia_cm`, `metodo_origen`) |
 | `GET` | `/api/saltos/<id>` | Obtiene por ID |
+| `PUT` | `/api/saltos/<id>` | Actualiza (JSON: `tipo_salto`, `distancia_cm`, `metodo_origen`; opcionales: `tiempo_vuelo_s`, `confianza_ia`) |
 | `DELETE` | `/api/saltos/<id>` | Elimina |
 | `GET` | `/api/usuarios/<id>/saltos` | Saltos de un usuario |
 
@@ -120,6 +128,13 @@ Flask app.py          (API)         — POST /api/salto/calcular → JSON
 |--------|------|-------------|
 | `GET` | `/api/usuarios/<id>/progreso` | Cuántos saltos tiene vs mínimo (4+4) |
 | `GET` | `/api/usuarios/<id>/comparativa` | Estadísticas por tipo (mejor, peor, media, último, evolución). 403 si no cumple mínimo |
+
+### Analítica avanzada
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/api/usuarios/<id>/fatiga?tipo=vertical` | Fatiga intra-sesión: pendiente, nº saltos, caída %, alerta |
+| `GET` | `/api/usuarios/<id>/tendencia?tipo=vertical` | Tendencia histórica: pendiente cm/semana, R², predicción 4 semanas, estado |
 
 ## Algoritmos
 
@@ -163,7 +178,7 @@ Donde `Hr` = altura real (m), `Hp` = altura en píxeles, `Dp` = desplazamiento h
 
 MediaPipe se configura con `num_poses=2` para detectar hasta dos personas. Si hay una segunda detección (reflejo en una superficie cercana), se selecciona la **silueta más grande** (mayor distancia cabeza-pies en píxeles), descartando automáticamente el reflejo.
 
-## Estado — Fase 2
+## Estado
 
 - [x] Backend MVC funcional
 - [x] Procesamiento de vídeo con MediaPipe PoseLandmarker (Tasks API)
@@ -176,4 +191,9 @@ MediaPipe se configura con `num_poses=2` para detectar hasta dos personas. Si ha
 - [x] Regla de negocio: mínimo 4+4 saltos para comparativa
 - [x] Endpoint de progreso y comparativa (estadísticas al vuelo)
 - [x] Frontend web integrado en `integration/web/salto.html`
+- [x] Ángulos articulares (rodilla + cadera) en el frame de despegue
+- [x] Potencia de Sayers (requiere `peso_kg` en perfil de usuario)
+- [x] Asimetría bilateral (alerta visual si > 15 %)
+- [x] Endpoint de fatiga intra-sesión (`GET /api/usuarios/<id>/fatiga`)
+- [x] Endpoint de tendencia histórica (`GET /api/usuarios/<id>/tendencia`)
 - [ ] Cliente móvil para grabar y enviar vídeo (`mobile/`)

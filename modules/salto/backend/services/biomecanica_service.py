@@ -1,15 +1,15 @@
 """
-SERVICE — Trigonometria pura para angulos articulares.
+SERVICIO — Trigonometría pura para ángulos articulares y biomecánica.
 
 Este modulo no depende de video, red ni base de datos. Solo opera con
-puntos/vectores 2D y devuelve angulos en grados.
+puntos/vectores 2D y devuelve angulos en grados o potencia en watts.
 """
 
 from math import atan2, degrees
 
 
 class BiomecanicaService:
-    """Funciones puras para calcular angulos biomecanicos en 2D."""
+    """Funciones puras para calcular angulos biomecanicos en 2D y potencia."""
 
     @staticmethod
     def angulo_entre_vectores_deg(v1: tuple[float, float], v2: tuple[float, float]) -> float | None:
@@ -48,3 +48,14 @@ class BiomecanicaService:
         v1 = (ax - p_origen_v1[0], ay - p_origen_v1[1])
         v2 = (ax - p_origen_v2[0], ay - p_origen_v2[1])
         return BiomecanicaService.angulo_entre_vectores_deg(v1, v2)
+
+    @staticmethod
+    def potencia_sayers(altura_cm: float, peso_kg: float) -> float:
+        """
+        Potencia pico de miembros inferiores (ecuación de Sayers, 1999).
+
+            P (W) = 60.7 × altura_cm + 45.3 × peso_kg − 2055
+
+        Validada contra plataformas de fuerza (R² > 0.88).
+        """
+        return 60.7 * altura_cm + 45.3 * peso_kg - 2055

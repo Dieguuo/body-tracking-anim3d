@@ -27,6 +27,7 @@ from controllers.salto_controller import SaltoController
 from controllers.usuario_controller import usuarios_bp
 from controllers.salto_db_controller import saltos_bp
 from models.salto_model import SaltoModel
+from models.usuario_model import UsuarioModel
 import mysql.connector
 
 app = Flask(__name__)
@@ -48,6 +49,7 @@ app.register_blueprint(saltos_bp)
 
 controller = SaltoController()
 salto_model = SaltoModel()
+usuario_model = UsuarioModel()
 
 # Crear carpeta de uploads si no existe
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -116,7 +118,18 @@ def calcular_salto():
     archivo.save(ruta_video)
 
     try:
-        resultado = controller.procesar_salto(ruta_video, tipo_salto, altura_real_m)
+        # Buscar peso_kg del usuario si se proporcionó id_usuario
+        peso_kg = None
+        id_usuario_str = request.form.get("id_usuario")
+        if id_usuario_str:
+            try:
+                usuario = usuario_model.obtener_por_id(int(id_usuario_str))
+                if usuario and usuario.get("peso_kg"):
+                    peso_kg = float(usuario["peso_kg"])
+            except (ValueError, TypeError):
+                pass
+
+        resultado = controller.procesar_salto(ruta_video, tipo_salto, altura_real_m, peso_kg)
 
         respuesta = {
             "tipo_salto": resultado.tipo_salto,
@@ -128,13 +141,14 @@ def calcular_salto():
             "tiempo_vuelo_s": resultado.tiempo_vuelo_s,
             "angulo_rodilla_deg": resultado.angulo_rodilla_deg,
             "angulo_cadera_deg": resultado.angulo_cadera_deg,
+            "potencia_w": resultado.potencia_w,
+            "asimetria_pct": resultado.asimetria_pct,
             "metodo": resultado.metodo,
             "dist_por_pixeles": resultado.dist_por_pixeles,
             "dist_por_cinematica": resultado.dist_por_cinematica,
         }
 
         # Guardar en BD si se proporcionó id_usuario
-        id_usuario_str = request.form.get("id_usuario")
         if id_usuario_str and resultado.distancia > 0:
             try:
                 id_usuario = int(id_usuario_str)

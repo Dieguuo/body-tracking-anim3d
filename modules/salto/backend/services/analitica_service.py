@@ -1,5 +1,5 @@
 """
-SERVICE — Analítica avanzada de rendimiento del salto.
+SERVICIO — Analítica avanzada de rendimiento del salto.
 
 Incluye:
 - Detección de fatiga intra-sesión (ventana de 2 horas)

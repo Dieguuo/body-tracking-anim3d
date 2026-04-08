@@ -1,5 +1,5 @@
 """
-CONTROLLER — Endpoints REST para la tabla `usuarios`.
+CONTROLADOR — Endpoints REST para la tabla `usuarios`.
 
 Rutas:
     GET    /api/usuarios                  → Lista todos los usuarios
@@ -104,8 +104,18 @@ def crear():
     except (ValueError, TypeError):
         return jsonify({"error": "altura_m debe ser un número válido"}), 400
 
+    peso_kg = None
+    peso_str = data.get("peso_kg")
+    if peso_str is not None:
+        try:
+            peso_kg = float(peso_str)
+            if not (20 <= peso_kg <= 300):
+                return jsonify({"error": "peso_kg debe estar entre 20 y 300 kg"}), 400
+        except (ValueError, TypeError):
+            return jsonify({"error": "peso_kg debe ser un número válido"}), 400
+
     try:
-        nuevo_id = _usuario_model.crear(alias, nombre, altura)
+        nuevo_id = _usuario_model.crear(alias, nombre, altura, peso_kg)
     except IntegrityError:
         return jsonify({"error": f"El alias '{alias}' ya existe"}), 409
 
@@ -140,8 +150,18 @@ def actualizar(id_usuario):
     except (ValueError, TypeError):
         return jsonify({"error": "altura_m debe ser un número válido"}), 400
 
+    peso_kg = None
+    peso_str = data.get("peso_kg")
+    if peso_str is not None:
+        try:
+            peso_kg = float(peso_str)
+            if not (20 <= peso_kg <= 300):
+                return jsonify({"error": "peso_kg debe estar entre 20 y 300 kg"}), 400
+        except (ValueError, TypeError):
+            return jsonify({"error": "peso_kg debe ser un número válido"}), 400
+
     try:
-        ok = _usuario_model.actualizar(id_usuario, alias, nombre, altura)
+        ok = _usuario_model.actualizar(id_usuario, alias, nombre, altura, peso_kg)
     except IntegrityError:
         return jsonify({"error": f"El alias '{alias}' ya existe"}), 409
 

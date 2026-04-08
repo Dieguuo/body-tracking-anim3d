@@ -1,5 +1,5 @@
 """
-MODEL — Pool de conexiones a MySQL.
+MODELO — Pool de conexiones a MySQL.
 
 Proporciona un context manager `get_connection()` que obtiene una conexión
 del pool y la devuelve al terminar (o hace rollback si hay excepción).

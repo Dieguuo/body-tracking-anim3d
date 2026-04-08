@@ -895,6 +895,19 @@ function animarResultados(datos) {
     document.getElementById('data-angulo-rodilla').textContent = Number.isFinite(anguloRodilla) ? `${anguloRodilla.toFixed(2)} deg` : '--';
     document.getElementById('data-angulo-cadera').textContent = Number.isFinite(anguloCadera) ? `${anguloCadera.toFixed(2)} deg` : '--';
 
+    const potencia = Number(datos.potencia_w);
+    document.getElementById('data-potencia').textContent = Number.isFinite(potencia) ? `${potencia} W` : '--';
+
+    const asimetria = Number(datos.asimetria_pct);
+    const elAsimetria = document.getElementById('data-asimetria');
+    if (Number.isFinite(asimetria)) {
+        elAsimetria.textContent = `${asimetria}%`;
+        elAsimetria.style.color = asimetria > 15 ? '#ff6b6b' : '';
+    } else {
+        elAsimetria.textContent = '--';
+        elAsimetria.style.color = '';
+    }
+
     panelResultados.classList.add('show');
 }
 

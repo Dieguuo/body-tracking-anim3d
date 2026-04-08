@@ -1,5 +1,5 @@
 """
-SERVICE — Cálculos matemáticos puros para salto vertical y horizontal.
+SERVICIO — Cálculos matemáticos puros para salto vertical y horizontal.
 
 No accede a vídeo ni a red. Solo recibe datos numéricos y devuelve resultados.
 """
@@ -27,11 +27,13 @@ class ResultadoSalto:
     dist_por_cinematica: float | None = None  # cm (solo vertical)
     angulo_rodilla_deg: float | None = None
     angulo_cadera_deg: float | None = None
+    potencia_w: float | None = None
+    asimetria_pct: float | None = None
 
 
 class CalculoService:
     """
-    SERVICE — Implementa las fórmulas de cinemática para salto vertical
+    SERVICIO — Implementa las fórmulas de cinemática para salto vertical
     y de proyección geométrica para salto horizontal.
     """
 
@@ -40,6 +42,7 @@ class CalculoService:
         frames: list[FramePies],
         fps: float,
         altura_real_m: float,
+        peso_kg: float | None = None,
     ) -> ResultadoSalto:
         """
         Salto vertical — combina dos métodos:
@@ -100,6 +103,14 @@ class CalculoService:
             distancia_final = altura_cin_cm
             metodo = "cinematica"
 
+        # ── Potencia de Sayers (solo si hay peso) ──
+        potencia_w = None
+        if peso_kg is not None and peso_kg > 0 and distancia_final > 0:
+            potencia_w = round(BiomecanicaService.potencia_sayers(distancia_final, peso_kg), 1)
+
+        # ── Asimetría bilateral ──
+        asimetria_pct = self._calcular_asimetria(frames, despegue)
+
         return ResultadoSalto(
             tipo_salto="vertical",
             distancia=round(distancia_final, 2),
@@ -112,6 +123,8 @@ class CalculoService:
             dist_por_cinematica=round(altura_cin_cm, 2),
             angulo_rodilla_deg=round(angulo_rodilla, 2) if angulo_rodilla is not None else None,
             angulo_cadera_deg=round(angulo_cadera, 2) if angulo_cadera is not None else None,
+            potencia_w=potencia_w,
+            asimetria_pct=asimetria_pct,
         )
 
     def calcular_horizontal(
@@ -339,3 +352,35 @@ class CalculoService:
             p_origen_v2=p_rodilla,
         )
         return angulo_rodilla, angulo_cadera
+
+    @staticmethod
+    def _calcular_asimetria(frames: list[FramePies], idx_despegue: int) -> float | None:
+        """
+        Compara el desplazamiento Y del talón izquierdo vs derecho durante el despegue.
+
+        ASI = (|izq − der| / max(izq, der)) × 100
+        """
+        if idx_despegue < 0 or idx_despegue >= len(frames):
+            return None
+
+        f = frames[idx_despegue]
+        if f.talon_izq_y is None or f.talon_der_y is None:
+            return None
+
+        # Desplazamiento de cada talón respecto a su posición en reposo
+        # (frame 0 como referencia, si disponible)
+        ref = frames[0] if frames else f
+        if ref.talon_izq_y is None or ref.talon_der_y is None:
+            # Sin referencia, usar valores absolutos del frame de despegue
+            izq = abs(f.talon_izq_y)
+            der = abs(f.talon_der_y)
+        else:
+            izq = abs(ref.talon_izq_y - f.talon_izq_y)
+            der = abs(ref.talon_der_y - f.talon_der_y)
+
+        maximo = max(izq, der)
+        if maximo == 0:
+            return 0.0
+
+        asi = (abs(izq - der) / maximo) * 100
+        return round(asi, 1)
