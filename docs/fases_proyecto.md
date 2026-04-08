@@ -70,12 +70,12 @@ Prerequisito: Fase 2 completada (landmarks + historial de saltos en BD).
 
 ### 5.2 Ángulos articulares en el despegue
 
-- [ ] Extraer landmarks de cadera (23/24), rodilla (25/26) y tobillo (27/28) en el frame de despegue
-- [ ] Calcular ángulo de rodilla: `θ = arctan2` entre vectores cadera→rodilla y tobillo→rodilla
-- [ ] Calcular ángulo de cadera: entre vectores hombro→cadera y rodilla→cadera
-- [ ] Crear `biomecanica_service.py` con funciones de trigonometría puras
-- [ ] Devolver `angulo_rodilla_deg` y `angulo_cadera_deg` en la respuesta JSON
-- [ ] Mostrar ángulos en panel de resultados (dato técnico adicional)
+- [x] Extraer landmarks de cadera (23/24), rodilla (25/26) y tobillo (27/28) en el frame de despegue
+- [x] Calcular ángulo de rodilla: `θ = arctan2` entre vectores cadera→rodilla y tobillo→rodilla
+- [x] Calcular ángulo de cadera: entre vectores hombro→cadera y rodilla→cadera
+- [x] Crear `biomecanica_service.py` con funciones de trigonometría puras
+- [x] Devolver `angulo_rodilla_deg` y `angulo_cadera_deg` en la respuesta JSON
+- [x] Mostrar ángulos en panel de resultados (dato técnico adicional)
 
 ### 5.3 Asimetría bilateral
 
@@ -86,13 +86,13 @@ Prerequisito: Fase 2 completada (landmarks + historial de saltos en BD).
 
 ### 5.4 Detección de fatiga intra-sesión
 
-- [ ] Agrupar saltos por sesión (saltos del mismo usuario en un rango de 2 horas)
-- [ ] Calcular pendiente de regresión lineal sobre las distancias de la sesión
-- [ ] Endpoint `GET /api/usuarios/<id>/fatiga` que devuelva: pendiente, nº saltos, caída porcentual
-- [ ] Alerta en frontend si pendiente negativa significativa (>10% de caída)
+- [x] Agrupar saltos por sesión (saltos del mismo usuario en un rango de 2 horas)
+- [x] Calcular pendiente de regresión lineal sobre las distancias de la sesión
+- [x] Endpoint `GET /api/usuarios/<id>/fatiga` que devuelva: pendiente, nº saltos, caída porcentual
+- [x] Alerta en frontend si pendiente negativa significativa (>10% de caída)
 
 ### 5.5 Curva de progresión con tendencia
 
-- [ ] Endpoint `GET /api/usuarios/<id>/tendencia?tipo=vertical` con regresión sobre historial completo
-- [ ] Devolver: pendiente (cm/semana), R², predicción a 4 semanas, estado (mejorando/estancado/empeorando)
-- [ ] Gráfica de evolución en frontend (canvas o librería ligera tipo Chart.js)
+- [x] Endpoint `GET /api/usuarios/<id>/tendencia?tipo=vertical` con regresión sobre historial completo
+- [x] Devolver: pendiente (cm/semana), R², predicción a 4 semanas, estado (mejorando/estancado/empeorando)
+- [x] Gráfica de evolución en frontend (canvas o librería ligera tipo Chart.js)

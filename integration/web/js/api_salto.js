@@ -31,6 +31,8 @@ let toastTimer = null;
 
 const SALTOS_OBJETIVO_COMPARATIVA = 4;
 let medidasComparativa = [];
+let graficaTendencia = null;
+let ultimaAlertaFatigaClave = '';
 
 // getBackendBaseUrl() se carga desde js/config.js
 
@@ -131,6 +133,219 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function asignarTexto(id, texto) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.textContent = texto;
+    }
+}
+
+function limpiarAnaliticaPanel(mensaje = 'Selecciona un usuario para ver su tendencia.') {
+    asignarTexto('analitica-estado', mensaje);
+    asignarTexto('metrica-pendiente-historial', '-- cm/sem');
+    asignarTexto('metrica-r2', '--');
+    asignarTexto('metrica-prediccion', '-- cm');
+    asignarTexto('metrica-estado', '--');
+    asignarTexto('metrica-pendiente-sesion', '-- cm/salto');
+    asignarTexto('metrica-caida', '--%');
+
+    const alerta = document.getElementById('fatiga-alerta');
+    if (alerta) {
+        alerta.style.display = 'none';
+        alerta.textContent = '';
+    }
+
+    const canvas = document.getElementById('grafica-tendencia');
+    if (graficaTendencia) {
+        graficaTendencia.destroy();
+        graficaTendencia = null;
+    }
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+}
+
+function capitalizarEstado(estado) {
+    if (!estado) {
+        return '--';
+    }
+    return `${estado.charAt(0).toUpperCase()}${estado.slice(1)}`;
+}
+
+function renderGraficaTendencia(historial, tipo) {
+    const canvas = document.getElementById('grafica-tendencia');
+    if (!canvas || !window.Chart || !Array.isArray(historial)) {
+        return;
+    }
+
+    const labels = historial.map((punto, idx) => {
+        const fecha = new Date(punto.fecha);
+        if (Number.isNaN(fecha.getTime())) {
+            return `Salto ${idx + 1}`;
+        }
+        return fecha.toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit'
+        });
+    });
+
+    const valoresReales = historial.map((p) => Number(p.distancia_cm || 0));
+    const valoresTendencia = historial.map((p) => Number(p.tendencia_cm || 0));
+
+    if (graficaTendencia) {
+        graficaTendencia.destroy();
+        graficaTendencia = null;
+    }
+
+    graficaTendencia = new window.Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: `Saltos ${normalizarTextoTipo(tipo)}`,
+                    data: valoresReales,
+                    borderColor: '#59ffc7',
+                    backgroundColor: 'rgba(89, 255, 199, 0.16)',
+                    pointRadius: 3,
+                    tension: 0.28,
+                    fill: true
+                },
+                {
+                    label: 'Línea de tendencia',
+                    data: valoresTendencia,
+                    borderColor: '#cb9cff',
+                    borderDash: [7, 5],
+                    pointRadius: 0,
+                    tension: 0,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#ffffff',
+                        boxWidth: 10,
+                        boxHeight: 10
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#c9b8da' },
+                    grid: { color: 'rgba(255,255,255,0.08)' }
+                },
+                y: {
+                    ticks: { color: '#c9b8da' },
+                    grid: { color: 'rgba(255,255,255,0.08)' },
+                    title: {
+                        display: true,
+                        text: 'Distancia (cm)',
+                        color: '#c9b8da'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function actualizarPanelAnalitica(tendencia, fatiga, tipo) {
+    const pendienteHistorial = Number(tendencia.pendiente_cm_semana || tendencia.pendiente || 0);
+    const r2 = Number(tendencia.r2 || 0);
+    const prediccion = Number(tendencia.prediccion_4_semanas || 0);
+    const pendienteSesion = Number(fatiga.pendiente || 0);
+    const caidaPct = Number(fatiga.caida_porcentual || 0);
+
+    asignarTexto('metrica-pendiente-historial', `${pendienteHistorial.toFixed(2)} cm/sem`);
+    asignarTexto('metrica-r2', r2.toFixed(3));
+    asignarTexto('metrica-prediccion', `${prediccion.toFixed(2)} cm`);
+    asignarTexto('metrica-estado', capitalizarEstado(tendencia.estado));
+    asignarTexto('metrica-pendiente-sesion', `${pendienteSesion.toFixed(2)} cm/salto`);
+    asignarTexto('metrica-caida', `${caidaPct.toFixed(2)}% (${Number(fatiga.numero_saltos || 0)} saltos)`);
+
+    const info = [
+        `${Number(tendencia.numero_saltos || 0)} saltos en historial`,
+        `modo ${normalizarTextoTipo(tipo)}`
+    ];
+    if (fatiga.sesion && fatiga.sesion.inicio && fatiga.sesion.fin) {
+        const ini = new Date(fatiga.sesion.inicio);
+        const fin = new Date(fatiga.sesion.fin);
+        if (!Number.isNaN(ini.getTime()) && !Number.isNaN(fin.getTime())) {
+            info.push(`sesión ${ini.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} - ${fin.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`);
+        }
+    }
+    asignarTexto('analitica-estado', info.join(' | '));
+
+    const alerta = document.getElementById('fatiga-alerta');
+    if (alerta) {
+        if (Boolean(fatiga.fatiga_significativa)) {
+            alerta.style.display = 'block';
+            alerta.textContent = `Alerta de fatiga: caída de ${caidaPct.toFixed(1)}% en la sesión actual con pendiente negativa.`;
+        } else {
+            alerta.style.display = 'none';
+            alerta.textContent = '';
+        }
+    }
+
+    renderGraficaTendencia(tendencia.historial || [], tipo);
+}
+
+async function cargarAnaliticaUsuario({ mostrarErrores = false, lanzarToastFatiga = false } = {}) {
+    const usuario = getUsuarioActivo();
+    if (!usuario) {
+        limpiarAnaliticaPanel();
+        return;
+    }
+
+    const tipo = (document.getElementById('tipo-salto')?.value || 'vertical').toLowerCase();
+    asignarTexto('analitica-estado', 'Actualizando analítica...');
+
+    try {
+        const [respuestaFatiga, respuestaTendencia] = await Promise.all([
+            fetch(`${getBackendBaseUrl()}/api/usuarios/${usuario.idUsuario}/fatiga?tipo=${encodeURIComponent(tipo)}`),
+            fetch(`${getBackendBaseUrl()}/api/usuarios/${usuario.idUsuario}/tendencia?tipo=${encodeURIComponent(tipo)}`)
+        ]);
+
+        const [fatiga, tendencia] = await Promise.all([
+            respuestaFatiga.json(),
+            respuestaTendencia.json()
+        ]);
+
+        if (!respuestaFatiga.ok) {
+            throw new Error(fatiga.error || `Error fatiga: HTTP ${respuestaFatiga.status}`);
+        }
+        if (!respuestaTendencia.ok) {
+            throw new Error(tendencia.error || `Error tendencia: HTTP ${respuestaTendencia.status}`);
+        }
+
+        actualizarPanelAnalitica(tendencia, fatiga, tipo);
+
+        if (lanzarToastFatiga && Boolean(fatiga.fatiga_significativa)) {
+            const claveAlerta = [
+                usuario.idUsuario,
+                tipo,
+                fatiga.sesion?.fin || '',
+                Number(fatiga.caida_porcentual || 0).toFixed(2)
+            ].join('|');
+
+            if (claveAlerta !== ultimaAlertaFatigaClave) {
+                mostrarToast(`Alerta de fatiga detectada: caída del ${Number(fatiga.caida_porcentual || 0).toFixed(1)}%`, 'warn', 3500);
+                ultimaAlertaFatigaClave = claveAlerta;
+            }
+        }
+    } catch (error) {
+        asignarTexto('analitica-estado', `No se pudo cargar la analítica: ${error.message}`);
+        if (mostrarErrores) {
+            mostrarToast(`No se pudo cargar la analítica: ${error.message}`, 'error', 3200);
+        }
+    }
 }
 
 function mostrarComparativa(alias, tipoSalto, medidas) {
@@ -468,6 +683,9 @@ function procesarResultadoSegunModo(datos) {
     const modo = getModoAnalisis();
     if (modo !== 'comparativa') {
         animarResultados(datos);
+        cargarAnaliticaUsuario({ lanzarToastFatiga: true }).catch(() => {
+            // La UI principal ya mostró el resultado del salto.
+        });
         return;
     }
 
@@ -480,6 +698,9 @@ function procesarResultadoSegunModo(datos) {
             'success',
             2200
         );
+        cargarAnaliticaUsuario({ lanzarToastFatiga: true }).catch(() => {
+            // No interrumpir modo comparativa si falla la analítica.
+        });
         return;
     }
 
@@ -487,6 +708,9 @@ function procesarResultadoSegunModo(datos) {
     const tipo = (datos.tipo_salto || document.getElementById('tipo-salto')?.value || 'vertical').toString().toLowerCase();
     mostrarComparativa(alias, tipo, medidasComparativa);
     resetComparativa();
+    cargarAnaliticaUsuario({ lanzarToastFatiga: true }).catch(() => {
+        // No interrumpir modo comparativa si falla la analítica.
+    });
 }
 
 document.addEventListener('iniciarDeteccion', () => {
@@ -605,6 +829,25 @@ document.getElementById('tipo-salto')?.addEventListener('change', () => {
     if (getModoAnalisis() === 'comparativa') {
         resetComparativa();
     }
+    cargarAnaliticaUsuario().catch(() => {
+        // El usuario puede seguir usando la app aunque falle la analítica.
+    });
+});
+
+document.addEventListener('usuarioSeleccionCambio', () => {
+    cargarAnaliticaUsuario().catch(() => {
+        // El flujo de usuario activo sigue funcionando aunque falle la analítica.
+    });
+});
+
+document.getElementById('btn-actualizar-analitica')?.addEventListener('click', () => {
+    cargarAnaliticaUsuario({ mostrarErrores: true }).catch(() => {
+        // El error ya se notifica con toast.
+    });
 });
 
 actualizarBadgeComparativa();
+limpiarAnaliticaPanel();
+cargarAnaliticaUsuario().catch(() => {
+    // Si falla al iniciar, se mantiene el panel en estado neutral.
+});

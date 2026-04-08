@@ -97,6 +97,48 @@
             </div>
 
             <div id="usuario-estado" class="sensor-nota">Sin usuario activo.</div>
+
+            <div class="analitica-panel">
+                <div class="analitica-header">
+                    <h3 class="analitica-titulo">Evolución y fatiga</h3>
+                    <button id="btn-actualizar-analitica" class="sensor-btn ghost-btn analitica-refresh" type="button">Actualizar</button>
+                </div>
+
+                <p id="analitica-estado" class="sensor-nota">Selecciona un usuario para ver su tendencia.</p>
+
+                <div id="fatiga-alerta" class="fatiga-alerta" style="display:none;"></div>
+
+                <div class="analitica-metricas">
+                    <div class="metrica-item">
+                        <span class="metrica-label">Pendiente historial</span>
+                        <strong id="metrica-pendiente-historial">-- cm/sem</strong>
+                    </div>
+                    <div class="metrica-item">
+                        <span class="metrica-label">R²</span>
+                        <strong id="metrica-r2">--</strong>
+                    </div>
+                    <div class="metrica-item">
+                        <span class="metrica-label">Predicción 4 semanas</span>
+                        <strong id="metrica-prediccion">-- cm</strong>
+                    </div>
+                    <div class="metrica-item">
+                        <span class="metrica-label">Estado</span>
+                        <strong id="metrica-estado">--</strong>
+                    </div>
+                    <div class="metrica-item">
+                        <span class="metrica-label">Pendiente sesión</span>
+                        <strong id="metrica-pendiente-sesion">-- cm/salto</strong>
+                    </div>
+                    <div class="metrica-item">
+                        <span class="metrica-label">Caída sesión</span>
+                        <strong id="metrica-caida">--%</strong>
+                    </div>
+                </div>
+
+                <div class="analitica-grafica-wrap">
+                    <canvas id="grafica-tendencia" height="190"></canvas>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -133,6 +175,7 @@
     <script src="js/config.js"></script>
     <script src="js/camara.js"></script>
     <script src="js/registro.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <script type="module" src="js/api_salto.js"></script>
 </body>
 </html>
