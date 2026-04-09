@@ -107,26 +107,26 @@ Objetivo: pasar de analizar solo el despegue a cubrir **todo el ciclo del salto*
 
 ### 6.1 Estabilidad de aterrizaje
 
-- [ ] Detectar el rango de frames post-aterrizaje (desde `frame_aterrizaje` hasta estabilización)
-- [ ] Calcular oscilación del centro de masa (varianza de Y del promedio de caderas, landmarks 23/24) en los N frames tras aterrizar
-- [ ] Calcular tiempo hasta estabilización: nº de frames hasta que la derivada de Y vuelve a ~0
-- [ ] Devolver `estabilidad_aterrizaje` en la respuesta JSON (objeto con `oscilacion_px`, `tiempo_estabilizacion_s`, `estable: bool`)
-- [ ] Mostrar métrica de estabilidad en el panel de resultados del frontend
+- [x] Detectar el rango de frames post-aterrizaje (desde `frame_aterrizaje` hasta estabilización)
+- [x] Calcular oscilación del centro de masa (varianza de Y del promedio de caderas, landmarks 23/24) en los N frames tras aterrizar
+- [x] Calcular tiempo hasta estabilización: nº de frames hasta que la derivada de Y vuelve a ~0
+- [x] Devolver `estabilidad_aterrizaje` en la respuesta JSON (objeto con `oscilacion_px`, `tiempo_estabilizacion_s`, `estable: bool`)
+- [x] Mostrar métrica de estabilidad en el panel de resultados del frontend
 
 ### 6.2 Análisis de amortiguación
 
-- [ ] Calcular ángulo de rodilla en el frame de aterrizaje (reutilizar `BiomecanicaService`)
-- [ ] Calcular flexión máxima de rodilla en los frames posteriores al aterrizaje (pico de amortiguación)
-- [ ] Calcular rango de amortiguación: diferencia entre ángulo al contacto y flexión máxima
-- [ ] Devolver `amortiguacion_deg` (rango de flexión) y `angulo_rodilla_aterrizaje_deg` en JSON
-- [ ] Alerta si amortiguación < 20° (recepción rígida, riesgo de lesión)
+- [x] Calcular ángulo de rodilla en el frame de aterrizaje (reutilizar `BiomecanicaService`)
+- [x] Calcular flexión máxima de rodilla en los frames posteriores al aterrizaje (pico de amortiguación)
+- [x] Calcular rango de amortiguación: diferencia entre ángulo al contacto y flexión máxima
+- [x] Devolver `amortiguacion_deg` (rango de flexión) y `angulo_rodilla_aterrizaje_deg` en JSON
+- [x] Alerta si amortiguación < 20° (recepción rígida, riesgo de lesión)
 
 ### 6.3 Simetría en la recepción
 
-- [ ] Comparar desplazamiento Y de talón izquierdo vs derecho en el momento del aterrizaje (misma lógica que ASI de despegue)
-- [ ] Comparar ángulo de rodilla izquierda vs derecha en el aterrizaje
-- [ ] Devolver `asimetria_recepcion_pct` en JSON
-- [ ] Alerta visual si asimetría de recepción > 15%
+- [x] Comparar desplazamiento Y de talón izquierdo vs derecho en el momento del aterrizaje (misma lógica que ASI de despegue)
+- [x] Comparar ángulo de rodilla izquierda vs derecha en el aterrizaje
+- [x] Devolver `asimetria_recepcion_pct` en JSON
+- [x] Alerta visual si asimetría de recepción > 15%
 
 ## Fase 7 — Análisis cinemático temporal del gesto
 
@@ -136,34 +136,34 @@ Objetivo: pasar de **métricas puntuales** (un ángulo en un frame) a **curvas t
 
 ### 7.1 Curvas angulares completas
 
-- [ ] Calcular ángulo de rodilla en cada frame del salto (desde N frames antes del despegue hasta N frames después del aterrizaje)
-- [ ] Calcular ángulo de cadera en cada frame del salto
-- [ ] Suavizar curvas con media móvil (3–5 frames) para filtrar ruido de MediaPipe
-- [ ] Devolver arrays `curva_rodilla_deg[]` y `curva_cadera_deg[]` en la respuesta JSON (o en endpoint separado)
+- [x] Calcular ángulo de rodilla en cada frame del salto (desde N frames antes del despegue hasta N frames después del aterrizaje)
+- [x] Calcular ángulo de cadera en cada frame del salto
+- [x] Suavizar curvas con media móvil (3–5 frames) para filtrar ruido de MediaPipe
+- [x] Devolver arrays `curva_rodilla_deg[]` y `curva_cadera_deg[]` en la respuesta JSON (o en endpoint separado)
 
 ### 7.2 Detección automática de fases del salto
 
-- [ ] Fase preparatoria (excéntrica): desde inicio hasta el mínimo de flexión de rodilla antes del despegue
-- [ ] Fase de impulsión (concéntrica): desde el mínimo de flexión hasta el despegue
-- [ ] Fase de vuelo: desde despegue hasta aterrizaje (ya detectada)
-- [ ] Fase de recepción: desde aterrizaje hasta estabilización (Fase 6.1)
-- [ ] Devolver `fases[]` con frame de inicio y fin de cada fase
+- [x] Fase preparatoria (excéntrica): desde inicio hasta el mínimo de flexión de rodilla antes del despegue
+- [x] Fase de impulsión (concéntrica): desde el mínimo de flexión hasta el despegue
+- [x] Fase de vuelo: desde despegue hasta aterrizaje (ya detectada)
+- [x] Fase de recepción: desde aterrizaje hasta estabilización (Fase 6.1)
+- [x] Devolver `fases[]` con frame de inicio y fin de cada fase
 
 ### 7.3 Velocidades articulares
 
-- [ ] Calcular velocidad angular de rodilla (derivada del ángulo entre frames consecutivos × fps)
-- [ ] Calcular velocidad angular de cadera
-- [ ] Detectar pico de velocidad de extensión (momento de máxima potencia articular)
-- [ ] Suavizar con media móvil para reducir ruido
-- [ ] Devolver `vel_rodilla_deg_s[]` y `vel_cadera_deg_s[]`
+- [x] Calcular velocidad angular de rodilla (derivada del ángulo entre frames consecutivos × fps)
+- [x] Calcular velocidad angular de cadera
+- [x] Detectar pico de velocidad de extensión (momento de máxima potencia articular)
+- [x] Suavizar con media móvil para reducir ruido
+- [x] Devolver `vel_rodilla_deg_s[]` y `vel_cadera_deg_s[]`
 
 ### 7.4 Métricas resumen del gesto
 
-- [ ] Pico de flexión de rodilla (valor y frame)
-- [ ] Pico de extensión de rodilla (valor y frame)
-- [ ] Rango de movimiento total (ROM) de rodilla y cadera
-- [ ] Ratio tiempo excéntrico / tiempo concéntrico
-- [ ] Devolver como objeto `resumen_gesto` en JSON
+- [x] Pico de flexión de rodilla (valor y frame)
+- [x] Pico de extensión de rodilla (valor y frame)
+- [x] Rango de movimiento total (ROM) de rodilla y cadera
+- [x] Ratio tiempo excéntrico / tiempo concéntrico
+- [x] Devolver como objeto `resumen_gesto` en JSON
 
 ## Fase 8 — Visualización técnica 2D
 
@@ -173,25 +173,25 @@ Objetivo: representar visualmente el análisis sin necesidad de un visor 3D. Má
 
 ### 8.1 Timeline interactivo del salto
 
-- [ ] Barra temporal con los frames del salto y eventos marcados (preparación, despegue, pico, aterrizaje, estabilización)
-- [ ] Clic en un evento → resaltar el frame y sus métricas
-- [ ] Superponer curvas de ángulo de rodilla y cadera sobre la línea temporal
-- [ ] Integrar en el panel de resultados de `salto.html`
+- [x] Barra temporal con los frames del salto y eventos marcados (preparación, despegue, pico, aterrizaje, estabilización)
+- [x] Clic en un evento → resaltar el frame y sus métricas
+- [x] Superponer curvas de ángulo de rodilla y cadera sobre la línea temporal
+- [x] Integrar en el panel de resultados de `salto.html`
 
 ### 8.2 Gráficas de curvas articulares
 
-- [ ] Gráfica de ángulo de rodilla vs tiempo (Chart.js o similar)
-- [ ] Gráfica de ángulo de cadera vs tiempo
-- [ ] Marcar fases del salto con colores de fondo
+- [x] Gráfica de ángulo de rodilla vs tiempo (Chart.js o similar)
+- [x] Gráfica de ángulo de cadera vs tiempo
+- [x] Marcar fases del salto con colores de fondo
 - [ ] Opción de comparar dos intentos superpuestos en la misma gráfica
 
 ### 8.3 Vídeo anotado con overlay
 
-- [ ] Procesar vídeo en backend con OpenCV: dibujar landmarks sobre los fotogramas
-- [ ] Superponer ángulos articulares como texto sobre la imagen
-- [ ] Marcar frames clave con indicadores visuales (despegue, pico, aterrizaje)
-- [ ] Devolver vídeo procesado como descarga o stream
-- [ ] Dibujar trayectoria de talones / centro de masa
+- [x] Procesar vídeo en backend con OpenCV: dibujar landmarks sobre los fotogramas
+- [x] Superponer ángulos articulares como texto sobre la imagen
+- [x] Marcar frames clave con indicadores visuales (despegue, pico, aterrizaje)
+- [x] Devolver vídeo procesado como descarga o stream
+- [x] Dibujar trayectoria de talones / centro de masa
 
 ## Fase 9 — Alertas inteligentes e interpretación automática
 

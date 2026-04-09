@@ -935,3 +935,101 @@ body {
     font-size: 0.8rem;
     text-align: center;
 }
+
+/* ═══════════════════════════════════════════════
+   PANELES DE ANÁLISIS AVANZADO (Fases 6-8)
+   ═══════════════════════════════════════════════ */
+
+.results-content {
+    overflow-y: auto;
+}
+
+.analisis-panel {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.analisis-panel-titulo {
+    font-size: 0.95rem;
+    color: #cb9cff;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.75rem;
+}
+
+.alerta-biomecanica {
+    margin-top: 0.6rem;
+    border-radius: 10px;
+    border: 1px solid rgba(248, 118, 135, 0.55);
+    background: rgba(187, 62, 77, 0.2);
+    color: #ffc3cc;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    padding: 0.5rem 0.6rem;
+}
+
+/* Timeline del salto */
+.timeline-barra {
+    display: flex;
+    width: 100%;
+    height: 32px;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.timeline-segmento {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #000;
+    font-size: 0.65rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    min-width: 24px;
+}
+
+.timeline-segmento:hover {
+    filter: brightness(1.25);
+}
+
+.timeline-marcador {
+    position: absolute;
+    top: -2px;
+    font-size: 1rem;
+    transform: translateX(-50%);
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
+
+.timeline-detalle {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 0.4rem;
+    text-align: center;
+    min-height: 1.1em;
+}
+
+/* Gráficas de curvas articulares */
+.grafica-wrap {
+    width: 100%;
+    height: 200px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.18);
+    padding: 0.4rem;
+    margin-top: 0.6rem;
+}
+
+.grafica-wrap canvas {
+    width: 100% !important;
+}

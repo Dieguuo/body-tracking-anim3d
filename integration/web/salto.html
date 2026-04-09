@@ -186,6 +186,92 @@
                 </div>
             </div>
 
+            <!-- Fase 6 — Aterrizaje -->
+            <div id="panel-aterrizaje" class="analisis-panel" style="display: none;">
+                <h3 class="analisis-panel-titulo">Biomecánica del aterrizaje</h3>
+                <div class="technical-data-grid">
+                    <div class="data-box">
+                        <span class="data-label">Oscilación CM</span>
+                        <span id="data-oscilacion" class="data-value">-- px</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">T. Estabilización</span>
+                        <span id="data-t-estabilizacion" class="data-value">-- s</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Estable</span>
+                        <span id="data-estable" class="data-value">--</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Ang. Rodilla Aterr.</span>
+                        <span id="data-rod-aterrizaje" class="data-value">-- deg</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Flex. Máxima</span>
+                        <span id="data-flex-maxima" class="data-value">-- deg</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Amortiguación</span>
+                        <span id="data-amortiguacion" class="data-value">-- deg</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Asim. Recepción</span>
+                        <span id="data-asim-recepcion" class="data-value">-- %</span>
+                    </div>
+                </div>
+                <div id="alerta-rigidez" class="alerta-biomecanica" style="display:none;">
+                    Alerta: amortiguación &lt; 20° — recepción rígida, riesgo de lesión.
+                </div>
+                <div id="alerta-asim-recep" class="alerta-biomecanica" style="display:none;"></div>
+            </div>
+
+            <!-- Fase 7 — Resumen del gesto -->
+            <div id="panel-resumen-gesto" class="analisis-panel" style="display: none;">
+                <h3 class="analisis-panel-titulo">Resumen del gesto</h3>
+                <div class="technical-data-grid">
+                    <div class="data-box">
+                        <span class="data-label">ROM Rodilla</span>
+                        <span id="data-rom-rodilla" class="data-value">-- deg</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">ROM Cadera</span>
+                        <span id="data-rom-cadera" class="data-value">-- deg</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Ratio Exc/Con</span>
+                        <span id="data-ratio-ec" class="data-value">--</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Pico Vel. Rodilla</span>
+                        <span id="data-pico-vel-rod" class="data-value">-- °/s</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fase 8.1 — Timeline del salto -->
+            <div id="panel-timeline" class="analisis-panel" style="display: none;">
+                <h3 class="analisis-panel-titulo">Timeline del salto</h3>
+                <div id="timeline-barra" class="timeline-barra"></div>
+                <p id="timeline-detalle" class="timeline-detalle"></p>
+            </div>
+
+            <!-- Fase 8.2 — Gráficas de curvas articulares -->
+            <div id="panel-graficas" class="analisis-panel" style="display: none;">
+                <h3 class="analisis-panel-titulo">Curvas articulares</h3>
+                <div class="grafica-wrap">
+                    <canvas id="grafica-rodilla" height="200"></canvas>
+                </div>
+                <div class="grafica-wrap">
+                    <canvas id="grafica-cadera" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Fase 8.3 — Descarga de vídeo anotado -->
+            <div id="panel-video-anotado" class="analisis-panel" style="display: none;">
+                <button id="btn-video-anotado" class="sensor-btn secondary-btn">Descargar vídeo anotado</button>
+                <span id="video-anotado-estado" class="sensor-nota"></span>
+            </div>
+
             <button id="btn-reintentar" class="primary-btn-large">Nuevo Salto</button>
         </div>
     </div>

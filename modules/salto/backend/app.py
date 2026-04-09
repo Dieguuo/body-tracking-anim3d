@@ -18,7 +18,7 @@ import uuid
 from dotenv import load_dotenv
 load_dotenv()  # carga .env antes de importar config
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
@@ -28,6 +28,7 @@ from controllers.usuario_controller import usuarios_bp
 from controllers.salto_db_controller import saltos_bp
 from models.salto_model import SaltoModel
 from models.usuario_model import UsuarioModel
+from services.video_anotado_service import generar_video_anotado
 import mysql.connector
 
 app = Flask(__name__)
@@ -146,6 +147,15 @@ def calcular_salto():
             "metodo": resultado.metodo,
             "dist_por_pixeles": resultado.dist_por_pixeles,
             "dist_por_cinematica": resultado.dist_por_cinematica,
+            # Fase 6 — Biomecánica del aterrizaje
+            "estabilidad_aterrizaje": resultado.estabilidad_aterrizaje,
+            "amortiguacion": resultado.amortiguacion,
+            "asimetria_recepcion_pct": resultado.asimetria_recepcion_pct,
+            # Fase 7 — Análisis cinemático temporal
+            "curvas_angulares": resultado.curvas_angulares,
+            "fases_salto": resultado.fases_salto,
+            "velocidades_articulares": resultado.velocidades_articulares,
+            "resumen_gesto": resultado.resumen_gesto,
         }
 
         # Guardar en BD si se proporcionó id_usuario
@@ -193,8 +203,94 @@ def calcular_salto():
             os.remove(ruta_video)
 
 
+@app.route("/api/salto/video-anotado", methods=["POST"])
+def video_anotado():
+    """
+    Recibe un vídeo, lo procesa y devuelve un vídeo con overlay de
+    landmarks, ángulos articulares y marcadores de eventos.
+
+    Form-data esperado:
+        - video: archivo .mp4 / .webm / .avi / .mov
+        - tipo_salto: "vertical" | "horizontal"
+        - altura_real_m: float
+    """
+    if "video" not in request.files:
+        return jsonify({"error": "No se recibió ningún archivo de vídeo"}), 400
+
+    archivo = request.files["video"]
+    if archivo.filename == "":
+        return jsonify({"error": "El archivo no tiene nombre"}), 400
+
+    ext = os.path.splitext(secure_filename(archivo.filename))[1].lower()
+    if ext not in EXTENSIONES_PERMITIDAS:
+        return jsonify({"error": "Extensión no permitida"}), 400
+
+    tipo_salto = request.form.get("tipo_salto", "vertical").strip().lower()
+    altura_str = request.form.get("altura_real_m")
+    if not altura_str:
+        return jsonify({"error": "'altura_real_m' es obligatorio"}), 400
+    try:
+        altura_real_m = float(altura_str)
+        if altura_real_m <= 0:
+            raise ValueError
+    except ValueError:
+        return jsonify({"error": "'altura_real_m' debe ser un número positivo"}), 400
+
+    nombre_base = uuid.uuid4().hex
+    ruta_entrada = os.path.join(UPLOAD_FOLDER, f"{nombre_base}{ext}")
+    ruta_salida = os.path.join(UPLOAD_FOLDER, f"{nombre_base}_anotado.mp4")
+    archivo.save(ruta_entrada)
+
+    try:
+        # Obtener frames de despegue/aterrizaje procesando primero
+        peso_kg = None
+        id_usuario_str = request.form.get("id_usuario")
+        if id_usuario_str:
+            try:
+                usuario = usuario_model.obtener_por_id(int(id_usuario_str))
+                if usuario and usuario.get("peso_kg"):
+                    peso_kg = float(usuario["peso_kg"])
+            except (ValueError, TypeError):
+                pass
+
+        resultado = controller.procesar_salto(ruta_entrada, tipo_salto, altura_real_m, peso_kg)
+
+        # Detectar frame del pico (máxima altura = mínimo Y en curvas)
+        frame_pico = None
+        if resultado.curvas_angulares and resultado.frame_despegue is not None and resultado.frame_aterrizaje is not None:
+            resumen = resultado.resumen_gesto
+            if resumen and resumen.get("pico_flexion_rodilla"):
+                frame_pico = resumen["pico_flexion_rodilla"].get("frame_idx")
+
+        exito = generar_video_anotado(
+            ruta_video_entrada=ruta_entrada,
+            ruta_video_salida=ruta_salida,
+            frame_despegue=resultado.frame_despegue,
+            frame_aterrizaje=resultado.frame_aterrizaje,
+            frame_pico=frame_pico,
+        )
+
+        if not exito:
+            return jsonify({"error": "No se pudo generar el vídeo anotado"}), 500
+
+        return send_file(
+            ruta_salida,
+            mimetype="video/mp4",
+            as_attachment=True,
+            download_name="salto_anotado.mp4",
+        )
+    except Exception:
+        logging.exception("Error generando vídeo anotado")
+        return jsonify({"error": "Error interno al generar el vídeo anotado"}), 500
+    finally:
+        for ruta in [ruta_entrada, ruta_salida]:
+            if os.path.exists(ruta):
+                os.remove(ruta)
+
+
 if __name__ == "__main__":
     logging.info("Módulo Salto — API disponible en http://localhost:%s", FLASK_PORT)
     logging.info("POST /api/salto/calcular")
+    logging.info("POST /api/salto/video-anotado")
     logging.info("CRUD /api/usuarios, /api/saltos")
     app.run(host="0.0.0.0", port=FLASK_PORT, debug=False)

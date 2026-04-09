@@ -373,3 +373,108 @@ usuario, separado por tipo de salto. Se devuelven:
 
 Esto no requiere librerías adicionales — `numpy.polyfit(x, y, 1)` es
 suficiente para regresión lineal.
+
+---
+
+## Decisiones de la biomecánica del aterrizaje y análisis cinemático (Fases 6-8)
+
+## Centro de masa aproximado por promedio de caderas
+
+En un análisis clínico se usaría un modelo biomecánico completo (15+
+segmentos). Aquí se aproxima el centro de masa (CM) con el **promedio Y
+de las caderas** (landmarks 23 y 24 de MediaPipe). Es una simplificación
+aceptable para análisis 2D con cámara fija: la cadera está cerca del CM
+real del cuerpo y su oscilación post-aterrizaje refleja fielmente la
+estabilidad de la recepción.
+
+## Ventana post-aterrizaje fija de 30 frames
+
+En vídeos a 30 FPS, 30 frames equivalen a ~1 segundo. Es suficiente
+para capturar la fase de recepción completa (estabilización típica en
+0.3–0.8 s). Un valor mayor incluiría la siguiente preparación; uno menor
+podría cortar recepción es lentas. Si el vídeo termina antes, se usa lo
+disponible.
+
+## Umbral de estabilización en derivada de Y < 0.5 px/frame
+
+Se necesitan al menos 2 frames consecutivos con derivada menor que el
+umbral para considerar que el CM se ha estabilizado. Esto evita falsos
+positivos por un frame quieto aislado entre oscilaciones. El valor
+0.5 px/frame se determinó empíricamente en pruebas con vídeos de saltos
+reales.
+
+## Amortiguación medida como rango de flexión de rodilla
+
+En la literatura de biomecánica deportiva, la amortiguación en la
+recepción se evalúa por cuánto flexiona la rodilla después del contacto.
+Se calcula la diferencia entre el ángulo de rodilla al aterrizar y la
+flexión máxima alcanzada en los frames posteriores. El umbral de 20° lo
+establece `AterrizajeService` como alerta de rigidez: una recepción con
+menos de 20° de rango de flexión indica impacto casi directo en las
+articulaciones, factor de riesgo de lesión.
+
+## Simetría de recepción con la misma fórmula ASI
+
+Se reutiliza la fórmula ASI (ya implementada para el despegue en
+Fase 5.3) aplicándola al frame de aterrizaje. Esto mantiene coherencia
+en las métricas y no añade complejidad nueva. Los datos de ambos talones
+ya están disponibles en `FramePies`.
+
+## Curvas angulares con margen de ±15 frames
+
+El análisis cinemático cubre desde 15 frames antes del despegue hasta
+15 frames después del aterrizaje (`MARGEN_FRAMES = 15`). Incluir
+frames previos al despegue captura la fase preparatoria (contramovimiento);
+incluir frames post-aterrizaje captura la recepción completa. El suavizado
+con media móvil de 3 frames filtra el ruido inherente a la detección de
+landmarks por MediaPipe sin deformar la señal.
+
+## Detección de fases por mínimo de flexión de rodilla
+
+Las 4 fases del salto se segmentan automáticamente buscando el mínimo
+de flexión de rodilla antes del despegue (pico del contramovimiento):
+
+1. **Preparatoria**: desde el inicio del rango hasta el mínimo de flexión.
+2. **Impulsión**: desde el mínimo de flexión hasta el despegue.
+3. **Vuelo**: despegue → aterrizaje (ya detectados).
+4. **Recepción**: aterrizaje → estabilización (calculada por `AterrizajeService`).
+
+Esta segmentación no requiere clasificadores — es geometría sobre la
+curva de ángulo ya calculada.
+
+## Velocidades articulares por diferenciación finita
+
+La velocidad angular se calcula como `Δθ × fps` (°/s) entre frames
+consecutivos. No se necesitan sensores inerciales: la resolución temporal
+de MediaPipe a 30 FPS es suficiente para detectar picos de velocidad
+articular en movimientos explosivos como el salto.
+
+## Ratio excéntrico/concéntrico
+
+Se define como la duración de la fase preparatoria (excéntrica) dividida
+entre la duración de la fase de impulsión (concéntrica). Un ratio > 1
+indica que el sujeto tarda más en preparar que en impulsar (típico de
+principiantes). Un ratio cercano a 1 indica eficiencia neuromuscular.
+
+## Vídeo anotado con OpenCV en vez de frontend canvas
+
+Dibujar landmarks en tiempo real con canvas/WebGL requiere enviar las
+coordenadas al frontend y sincronizarlas con el vídeo. Anotar el vídeo
+en backend con OpenCV es más robusto: el usuario recibe un MP4 terminado
+que puede descargar, compartir y revisar offline. Se reutiliza MediaPipe
+PoseLandmarker en el vídeo original (segunda pasada) para obtener los
+landmarks frame a frame y dibujarlos con `cv2.line()` / `cv2.circle()`.
+
+## Selección de persona en vídeo anotado
+
+Al igual que en `VideoProcessor`, se detectan hasta 2 poses y se
+selecciona la silueta más grande (distancia cabeza-pies). Esto garantiza
+que los landmarks dibujados correspondan a la persona real y no al
+reflejo, coherente con el filtrado del procesamiento original.
+
+## Codec MP4V para el vídeo anotado
+
+Se usa el codec `mp4v` (MPEG-4 Part 2) con extensión `.mp4`. Es
+compatible con todos los navegadores y reproductores sin necesidad de
+codecs adicionales. El vídeo se elimina del disco tras enviarlo al
+cliente (`send_file` + limpieza en `finally`).

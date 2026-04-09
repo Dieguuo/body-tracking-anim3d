@@ -29,6 +29,15 @@ class ResultadoSalto:
     angulo_cadera_deg: float | None = None
     potencia_w: float | None = None
     asimetria_pct: float | None = None
+    # Fase 6 — Biomecánica del aterrizaje
+    estabilidad_aterrizaje: dict | None = None
+    amortiguacion: dict | None = None
+    asimetria_recepcion_pct: float | None = None
+    # Fase 7 — Análisis cinemático temporal
+    curvas_angulares: dict | None = None
+    fases_salto: list | None = None
+    velocidades_articulares: dict | None = None
+    resumen_gesto: dict | None = None
 
 
 class CalculoService:

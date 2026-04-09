@@ -126,6 +126,62 @@ Tras el análisis aparece un panel de resultados con:
 | **Potencia** | Potencia pico estimada en watts (requiere peso del usuario) |
 | **Asimetría** | Índice de asimetría bilateral (%). Rojo si > 15 % |
 
+Además de los datos básicos, aparecen **paneles avanzados** cuando se detecta un salto válido:
+
+##### Panel de biomecánica del aterrizaje
+
+| Campo | Significado |
+|-------|-------------|
+| **Oscilación CM** | Variabilidad del centro de masa tras aterrizar (px). Menor = más estable |
+| **T. Estabilización** | Tiempo en segundos hasta que el cuerpo se estabiliza |
+| **Estable** | Sí/No — indica si se alcanzó la estabilización en la ventana de análisis |
+| **Rod. Aterrizaje** | Ángulo de rodilla en el frame de aterrizaje (grados) |
+| **Flex. Máxima** | Flexión máxima de rodilla post-aterrizaje (amortiguación) |
+| **Amortiguación** | Rango de flexión = rod. aterrizaje − flex. máxima. Alerta si < 20° |
+| **Asim. Recepción** | Asimetría bilateral en el aterrizaje (%). Alerta si > 15% |
+
+> **Alertas:** si la amortiguación es menor de 20° aparece un aviso de "Recepción rígida". Si la asimetría de recepción supera el 15%, aparece un aviso de "Desequilibrio".
+
+##### Panel de resumen del gesto
+
+| Campo | Significado |
+|-------|-------------|
+| **ROM Rodilla** | Rango de movimiento total de la rodilla durante el salto (grados) |
+| **ROM Cadera** | Rango de movimiento total de la cadera durante el salto (grados) |
+| **Ratio Exc/Con** | Ratio entre la duración de la fase excéntrica y la concéntrica |
+| **Pico Vel. Rodilla** | Velocidad angular máxima de la rodilla (°/s) |
+
+##### Timeline interactivo
+
+Barra temporal con colores que representan las 4 fases del salto:
+
+| Color | Fase | Descripción |
+|-------|------|-------------|
+| Violeta | Preparatoria | Contramovimiento (flexión excéntrica) |
+| Cian | Impulsión | Extensión concéntrica hasta el despegue |
+| Verde | Vuelo | Fase aérea |
+| Naranja | Recepción | Desde el aterrizaje hasta la estabilización |
+
+Al hacer clic en un segmento se muestra el rango de frames de esa fase.
+
+##### Gráficas de curvas articulares
+
+Dos gráficas Chart.js que muestran la evolución del ángulo articular a lo largo del tiempo:
+- **Ángulo de rodilla vs tiempo** (grados)
+- **Ángulo de cadera vs tiempo** (grados)
+
+Cada gráfica marca con colores de fondo las fases del salto y señala los eventos clave (despegue, aterrizaje).
+
+##### Descarga de vídeo anotado
+
+Botón **"Descargar vídeo anotado"** que solicita al backend un vídeo con overlay:
+- Esqueleto de landmarks dibujado sobre cada frame
+- Ángulos de rodilla en tiempo real
+- Marcadores de eventos (DESPEGUE, ATERRIZAJE, PICO)
+- Trayectoria del centro de masa
+
+El vídeo se descarga como archivo `.mp4`.
+
 #### 5. Repetir
 
 Pulsar **"Nuevo Salto"** para volver a la vista de cámara y hacer otro intento.
@@ -267,3 +323,19 @@ La conexión se configura en `modules/salto/backend/config.py` (`DB_CONFIG`).
 | `GET` | `/api/usuarios/<id>/tendencia?tipo=vertical` | Tendencia histórica: pendiente cm/semana, R², predicción 4 semanas, estado (mejorando/estancado/empeorando) |
 
 Ambos endpoints aceptan `?tipo=vertical` o `?tipo=horizontal` (por defecto: `vertical`).
+
+### 8.7 Vídeo anotado
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/api/salto/video-anotado` | Procesa un vídeo y devuelve una versión anotada con overlay de landmarks, ángulos y eventos |
+
+**Form-data:**
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| `video` | archivo | Siempre | Vídeo .mp4 / .webm / .avi / .mov |
+| `tipo_salto` | string | Siempre | `"vertical"` o `"horizontal"` |
+| `altura_real_m` | float | Siempre | Altura real del usuario en metros |
+
+**Respuesta:** descarga directa del vídeo anotado como `.mp4`.

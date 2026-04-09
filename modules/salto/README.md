@@ -13,7 +13,7 @@ salto/
 │   ├── config.py                    ← Constantes centralizadas + DB_CONFIG
 │   ├── pose_landmarker_lite.task    ← Modelo MediaPipe descargado
 │   ├── controllers/
-│   │   ├── salto_controller.py      ← Orquesta procesamiento + cálculo
+│   │   ├── salto_controller.py      ← Orquesta procesamiento + cálculo + análisis avanzado
 │   │   ├── usuario_controller.py    ← CRUD usuarios + progreso + comparativa
 │   │   └── salto_db_controller.py   ← CRUD saltos en BD
 │   ├── models/
@@ -24,6 +24,9 @@ salto/
 │   ├── services/
 │   │   ├── calculo_service.py       ← Fórmulas: vertical (híbrido cinemática + calibración) + horizontal (calibración)
 │   │   ├── biomecanica_service.py   ← Trigonometría pura para ángulos articulares
+│   │   ├── aterrizaje_service.py    ← Biomecánica del aterrizaje: estabilidad, amortiguación, simetría recepción
+│   │   ├── cinematico_service.py    ← Análisis cinemático temporal: curvas angulares, fases, velocidades
+│   │   ├── video_anotado_service.py ← Generación de vídeo con overlay (landmarks + ángulos + eventos)
 │   │   ├── analitica_service.py     ← Fatiga intra-sesión + tendencia histórica
 │   │   └── comparativa_service.py   ← Lógica de negocio: progreso (mín. 4+4) y estadísticas
 │   └── uploads/                     ← Vídeos temporales (auto-limpieza)
@@ -78,11 +81,70 @@ Content-Type: multipart/form-data
   "asimetria_pct": 8.3,
   "metodo": "hibrido",
   "dist_por_pixeles": 36.45,
-  "dist_por_cinematica": 30.67
+  "dist_por_cinematica": 30.67,
+  "estabilidad_aterrizaje": {
+    "oscilacion_px": 3.45,
+    "tiempo_estabilizacion_s": 0.267,
+    "estable": true
+  },
+  "amortiguacion": {
+    "angulo_rodilla_aterrizaje_deg": 155.2,
+    "flexion_maxima_deg": 118.7,
+    "rango_amortiguacion_deg": 36.5,
+    "alerta_rigidez": false
+  },
+  "asimetria_recepcion_pct": 6.2,
+  "curvas_angulares": {
+    "frame_inicio": 27,
+    "frame_fin": 73,
+    "indices": [27, 28, 29, "..."],
+    "timestamps_s": [0.0, 0.033, 0.067, "..."],
+    "rodilla_deg": [165.1, 162.4, "..."],
+    "cadera_deg": [170.3, 168.9, "..."]
+  },
+  "fases_salto": [
+    { "fase": "preparatoria", "frame_inicio": 27, "frame_fin": 35 },
+    { "fase": "impulsion", "frame_inicio": 35, "frame_fin": 42 },
+    { "fase": "vuelo", "frame_inicio": 42, "frame_fin": 58 },
+    { "fase": "recepcion", "frame_inicio": 58, "frame_fin": 66 }
+  ],
+  "velocidades_articulares": {
+    "vel_rodilla_deg_s": [12.5, 25.3, "..."],
+    "vel_cadera_deg_s": [8.1, 15.6, "..."],
+    "pico_vel_rodilla": 485.2,
+    "pico_vel_cadera": 312.8
+  },
+  "resumen_gesto": {
+    "pico_flexion_rodilla": { "valor_deg": 98.5, "frame_idx": 35 },
+    "pico_extension_rodilla": { "valor_deg": 172.3, "frame_idx": 41 },
+    "rom_rodilla_deg": 73.8,
+    "rom_cadera_deg": 45.2,
+    "ratio_excentrico_concentrico": 1.14
+  }
 }
 ```
 
 > Los campos `metodo`, `dist_por_pixeles` y `dist_por_cinematica` solo aparecen en salto vertical.
+> Los campos de Fases 6-7 (`estabilidad_aterrizaje`, `amortiguacion`, etc.) son `null` si no se detectó un salto válido (despegue + aterrizaje).
+
+### Vídeo anotado con overlay
+
+```
+POST /api/salto/video-anotado
+Content-Type: multipart/form-data
+```
+
+| Campo | Tipo | Requerido | Descripción |
+|-------|------|-----------|-------------|
+| `video` | archivo | Siempre | Vídeo .mp4 / .webm / .avi / .mov |
+| `tipo_salto` | string | Siempre | `"vertical"` o `"horizontal"` |
+| `altura_real_m` | float | Siempre | Altura real del usuario en metros |
+
+**Respuesta:** Descarga directa del vídeo anotado (`.mp4`) con:
+- Esqueleto de landmarks dibujado sobre cada frame
+- Ángulos de rodilla (izq/der) como texto superpuesto
+- Marcadores de eventos: DESPEGUE (amarillo), ATERRIZAJE (naranja), PICO (magenta)
+- Trayectoria del centro de masa en los frames post-aterrizaje
 
 ## Arquitectura interna
 
@@ -90,15 +152,21 @@ Content-Type: multipart/form-data
 Vídeo grabado (.mp4 / .webm)
       │  Upload via POST
       ▼
-VideoProcessor        (Modelo)      — MediaPipe PoseLandmarker, extrae pies por frame
+VideoProcessor          (Modelo)      — MediaPipe PoseLandmarker, extrae landmarks por frame
       │
-CalculoService        (Servicio)    — fórmulas de cinemática y calibración
+CalculoService          (Servicio)    — fórmulas de cinemática y calibración
       │
-SaltoController       (Controlador) — orquesta modelo + servicio
+      ├── AterrizajeService             — Fase 6: estabilidad, amortiguación, simetría recepción
+      ├── CinematicoService             — Fase 7: curvas angulares, fases, velocidades, resumen
       │
-Flask app.py          (API)         — POST /api/salto/calcular → JSON
-                                        ↕
-                                    MySQL (usuarios + saltos)
+SaltoController         (Controlador) — orquesta modelo + servicios + enriquecimiento
+      │
+Flask app.py            (API)         — POST /api/salto/calcular → JSON
+                                         POST /api/salto/video-anotado → MP4
+                                           ↕
+                                       MySQL (usuarios + saltos)
+
+VideoAnotadoService     (Servicio)    — Fase 8.3: genera vídeo con overlay OpenCV
 ```
 
 ### CRUD Usuarios
@@ -174,6 +242,69 @@ D_real = Dp × S      (distancia real en metros)
 
 Donde `Hr` = altura real (m), `Hp` = altura en píxeles, `Dp` = desplazamiento horizontal en píxeles.
 
+## Análisis biomecánico del aterrizaje (Fase 6)
+
+Tras detectar el frame de aterrizaje, se analizan los N frames posteriores (ventana de 30 frames):
+
+### Estabilidad de aterrizaje
+
+- Se calcula la posición Y del centro de masa (promedio de caderas, landmarks 23/24) en cada frame post-aterrizaje.
+- La **oscilación** es la desviación estándar de Y en la ventana.
+- El **tiempo de estabilización** es el primer frame donde la derivada de Y < 0.5 px/frame durante al menos 2 frames consecutivos.
+
+### Amortiguación
+
+- Se calcula el ángulo de rodilla en el frame de aterrizaje.
+- Se busca la **flexión máxima** de rodilla en los frames post-aterrizaje.
+- El **rango de amortiguación** = ángulo al contacto − flexión máxima.
+- Alerta de **rigidez** si el rango < 20° (riesgo de lesión).
+
+### Simetría en la recepción
+
+- Se compara el desplazamiento Y del talón izquierdo vs derecho en el frame de aterrizaje (misma fórmula ASI del despegue).
+- Alerta si asimetría > 15%.
+
+## Análisis cinemático temporal (Fase 7)
+
+Pasa de métricas puntuales (un ángulo en un frame) a curvas temporales del gesto completo.
+
+### Curvas angulares
+
+- Se calcula el ángulo de rodilla y cadera en cada frame, desde 15 frames antes del despegue hasta 15 frames después del aterrizaje.
+- Suavizado con media móvil de 3 frames para filtrar ruido de MediaPipe.
+
+### Detección automática de fases
+
+| Fase | Inicio | Fin |
+|------|--------|-----|
+| **Preparatoria** (excéntrica) | Inicio del rango | Mínimo flexión de rodilla (antes del despegue) |
+| **Impulsión** (concéntrica) | Mínimo flexión | Frame de despegue |
+| **Vuelo** | Frame de despegue | Frame de aterrizaje |
+| **Recepción** | Frame de aterrizaje | Estabilización (o fin de la ventana) |
+
+### Velocidades articulares
+
+```
+ω = Δθ × fps    (°/s)
+```
+
+Se detecta el **pico de velocidad de extensión** de rodilla y cadera (momento de máxima potencia articular).
+
+### Métricas resumen del gesto
+
+- Pico de flexión y extensión de rodilla (valor y frame)
+- ROM (rango de movimiento) de rodilla y cadera
+- Ratio tiempo excéntrico / tiempo concéntrico
+
+## Vídeo anotado con overlay (Fase 8)
+
+Se genera un vídeo MP4 con OpenCV que superpone sobre el original:
+
+- **Esqueleto** dibujado con los landmarks de MediaPipe (líneas verdes, puntos rojos)
+- **Ángulos de rodilla** izquierda y derecha como texto (RI / RD)
+- **Marcadores de eventos**: banners semitransparentes en los frames de DESPEGUE, ATERRIZAJE y PICO
+- **Trayectoria del centro de masa** en los frames post-aterrizaje
+
 ## Filtrado de reflejos
 
 MediaPipe se configura con `num_poses=2` para detectar hasta dos personas. Si hay una segunda detección (reflejo en una superficie cercana), se selecciona la **silueta más grande** (mayor distancia cabeza-pies en píxeles), descartando automáticamente el reflejo.
@@ -196,4 +327,14 @@ MediaPipe se configura con `num_poses=2` para detectar hasta dos personas. Si ha
 - [x] Asimetría bilateral (alerta visual si > 15 %)
 - [x] Endpoint de fatiga intra-sesión (`GET /api/usuarios/<id>/fatiga`)
 - [x] Endpoint de tendencia histórica (`GET /api/usuarios/<id>/tendencia`)
+- [x] Estabilidad de aterrizaje (oscilación CM + tiempo de estabilización)
+- [x] Amortiguación de rodilla (flexión máxima + alerta rigidez < 20°)
+- [x] Simetría en la recepción (ASI bilateral al aterrizar)
+- [x] Curvas angulares completas (rodilla + cadera en todo el gesto)
+- [x] Detección automática de fases (preparatoria, impulsión, vuelo, recepción)
+- [x] Velocidades articulares (°/s) + pico de velocidad de extensión
+- [x] Métricas resumen del gesto (ROM, ratio excéntrico/concéntrico)
+- [x] Timeline interactivo con fases coloreadas y marcadores de eventos
+- [x] Gráficas de curvas articulares (Chart.js — rodilla y cadera vs tiempo)
+- [x] Vídeo anotado con overlay (`POST /api/salto/video-anotado`)
 - [ ] Cliente móvil para grabar y enviar vídeo (`mobile/`)
