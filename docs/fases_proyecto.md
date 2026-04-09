@@ -96,3 +96,168 @@ Prerequisito: Fase 2 completada (landmarks + historial de saltos en BD).
 - [x] Endpoint `GET /api/usuarios/<id>/tendencia?tipo=vertical` con regresión sobre historial completo
 - [x] Devolver: pendiente (cm/semana), R², predicción a 4 semanas, estado (mejorando/estancado/empeorando)
 - [x] Gráfica de evolución en frontend (canvas o librería ligera tipo Chart.js)
+
+---
+
+## Fase 6 — Biomecánica completa del aterrizaje
+
+Prerequisito: Fase 5 completada (ángulos articulares + asimetría ya implementados).
+
+Objetivo: pasar de analizar solo el despegue a cubrir **todo el ciclo del salto**, especialmente la recepción, que es donde se producen las lesiones.
+
+### 6.1 Estabilidad de aterrizaje
+
+- [ ] Detectar el rango de frames post-aterrizaje (desde `frame_aterrizaje` hasta estabilización)
+- [ ] Calcular oscilación del centro de masa (varianza de Y del promedio de caderas, landmarks 23/24) en los N frames tras aterrizar
+- [ ] Calcular tiempo hasta estabilización: nº de frames hasta que la derivada de Y vuelve a ~0
+- [ ] Devolver `estabilidad_aterrizaje` en la respuesta JSON (objeto con `oscilacion_px`, `tiempo_estabilizacion_s`, `estable: bool`)
+- [ ] Mostrar métrica de estabilidad en el panel de resultados del frontend
+
+### 6.2 Análisis de amortiguación
+
+- [ ] Calcular ángulo de rodilla en el frame de aterrizaje (reutilizar `BiomecanicaService`)
+- [ ] Calcular flexión máxima de rodilla en los frames posteriores al aterrizaje (pico de amortiguación)
+- [ ] Calcular rango de amortiguación: diferencia entre ángulo al contacto y flexión máxima
+- [ ] Devolver `amortiguacion_deg` (rango de flexión) y `angulo_rodilla_aterrizaje_deg` en JSON
+- [ ] Alerta si amortiguación < 20° (recepción rígida, riesgo de lesión)
+
+### 6.3 Simetría en la recepción
+
+- [ ] Comparar desplazamiento Y de talón izquierdo vs derecho en el momento del aterrizaje (misma lógica que ASI de despegue)
+- [ ] Comparar ángulo de rodilla izquierda vs derecha en el aterrizaje
+- [ ] Devolver `asimetria_recepcion_pct` en JSON
+- [ ] Alerta visual si asimetría de recepción > 15%
+
+## Fase 7 — Análisis cinemático temporal del gesto
+
+Prerequisito: Fase 6 completada (fases del salto bien delimitadas).
+
+Objetivo: pasar de **métricas puntuales** (un ángulo en un frame) a **curvas temporales** que describan cómo se comportan las articulaciones durante todo el movimiento.
+
+### 7.1 Curvas angulares completas
+
+- [ ] Calcular ángulo de rodilla en cada frame del salto (desde N frames antes del despegue hasta N frames después del aterrizaje)
+- [ ] Calcular ángulo de cadera en cada frame del salto
+- [ ] Suavizar curvas con media móvil (3–5 frames) para filtrar ruido de MediaPipe
+- [ ] Devolver arrays `curva_rodilla_deg[]` y `curva_cadera_deg[]` en la respuesta JSON (o en endpoint separado)
+
+### 7.2 Detección automática de fases del salto
+
+- [ ] Fase preparatoria (excéntrica): desde inicio hasta el mínimo de flexión de rodilla antes del despegue
+- [ ] Fase de impulsión (concéntrica): desde el mínimo de flexión hasta el despegue
+- [ ] Fase de vuelo: desde despegue hasta aterrizaje (ya detectada)
+- [ ] Fase de recepción: desde aterrizaje hasta estabilización (Fase 6.1)
+- [ ] Devolver `fases[]` con frame de inicio y fin de cada fase
+
+### 7.3 Velocidades articulares
+
+- [ ] Calcular velocidad angular de rodilla (derivada del ángulo entre frames consecutivos × fps)
+- [ ] Calcular velocidad angular de cadera
+- [ ] Detectar pico de velocidad de extensión (momento de máxima potencia articular)
+- [ ] Suavizar con media móvil para reducir ruido
+- [ ] Devolver `vel_rodilla_deg_s[]` y `vel_cadera_deg_s[]`
+
+### 7.4 Métricas resumen del gesto
+
+- [ ] Pico de flexión de rodilla (valor y frame)
+- [ ] Pico de extensión de rodilla (valor y frame)
+- [ ] Rango de movimiento total (ROM) de rodilla y cadera
+- [ ] Ratio tiempo excéntrico / tiempo concéntrico
+- [ ] Devolver como objeto `resumen_gesto` en JSON
+
+## Fase 8 — Visualización técnica 2D
+
+Prerequisito: Fase 7 completada (curvas angulares + fases disponibles).
+
+Objetivo: representar visualmente el análisis sin necesidad de un visor 3D. Máximo valor con mínima complejidad.
+
+### 8.1 Timeline interactivo del salto
+
+- [ ] Barra temporal con los frames del salto y eventos marcados (preparación, despegue, pico, aterrizaje, estabilización)
+- [ ] Clic en un evento → resaltar el frame y sus métricas
+- [ ] Superponer curvas de ángulo de rodilla y cadera sobre la línea temporal
+- [ ] Integrar en el panel de resultados de `salto.html`
+
+### 8.2 Gráficas de curvas articulares
+
+- [ ] Gráfica de ángulo de rodilla vs tiempo (Chart.js o similar)
+- [ ] Gráfica de ángulo de cadera vs tiempo
+- [ ] Marcar fases del salto con colores de fondo
+- [ ] Opción de comparar dos intentos superpuestos en la misma gráfica
+
+### 8.3 Vídeo anotado con overlay
+
+- [ ] Procesar vídeo en backend con OpenCV: dibujar landmarks sobre los fotogramas
+- [ ] Superponer ángulos articulares como texto sobre la imagen
+- [ ] Marcar frames clave con indicadores visuales (despegue, pico, aterrizaje)
+- [ ] Devolver vídeo procesado como descarga o stream
+- [ ] Dibujar trayectoria de talones / centro de masa
+
+## Fase 9 — Alertas inteligentes e interpretación automática
+
+Prerequisito: Fases 6–7 completadas (métricas completas disponibles).
+
+Objetivo: que los datos no solo se muestren, sino que **cuenten algo útil** al usuario. Capa de interpretación basada en reglas heurísticas.
+
+### 9.1 Alertas biomecánicas por salto
+
+- [ ] "Amortiguación insuficiente" si rango de flexión < 20° en recepción
+- [ ] "Extensión de cadera limitada" si ángulo de cadera < umbral en el despegue
+- [ ] "Desequilibrio en la recepción" si asimetría de recepción > 15%
+- [ ] "Recepción inestable" si tiempo de estabilización > umbral
+- [ ] Devolver array `alertas[]` con código, mensaje y severidad en JSON
+- [ ] Mostrar alertas en el panel de resultados con iconos y colores
+
+### 9.2 Alertas de tendencia entre sesiones
+
+- [ ] Alerta si asimetría empeora en las últimas 3 sesiones
+- [ ] Alerta si potencia cae de forma sostenida (pendiente negativa en últimas 5 sesiones)
+- [ ] Alerta si patrón de fatiga se repite (caída >10% en N sesiones consecutivas)
+- [ ] Integrar alertas de tendencia en el panel de analítica del frontend
+
+### 9.3 Observaciones automáticas
+
+- [ ] Generar texto descriptivo por salto: "Se detecta menor extensión de cadera respecto a la media del usuario"
+- [ ] Comparar métricas del salto actual vs media histórica del usuario
+- [ ] Clasificar salto como: equilibrado / asimétrico / fatigado / técnicamente correcto
+- [ ] Mostrar observaciones junto al panel de resultados
+
+## Fase 10 — Estadísticas avanzadas y correlaciones
+
+Prerequisito: volumen de datos suficiente en BD (múltiples usuarios con historial).
+
+Objetivo: extraer patrones y relaciones entre variables que no son evidentes a simple vista.
+
+### 10.1 Panel de evolución ampliado
+
+- [ ] Gráfica de evolución de potencia a lo largo del tiempo
+- [ ] Gráfica de evolución de asimetría a lo largo del tiempo
+- [ ] Comparativa visual entre sesiones (superponer métricas de dos sesiones)
+- [ ] Selector de métricas para la gráfica (distancia, potencia, asimetría, ángulos)
+
+### 10.2 Correlaciones y patrones
+
+- [ ] Correlación peso vs potencia vs distancia (scatter plot)
+- [ ] Correlación asimetría vs estabilidad de aterrizaje
+- [ ] Detección de estancamiento: meseta en la curva de rendimiento (varianza baja en últimas N sesiones)
+- [ ] Detección de mejora significativa (test estadístico simple sobre últimas sesiones vs anteriores)
+
+### 10.3 Rankings y comparativas
+
+- [ ] Ranking de mejores sesiones por distancia media
+- [ ] Comparativa entre tipos de salto (vertical vs horizontal) del mismo usuario
+- [ ] Predicción de rendimiento afinada (regresión con más variables: peso, potencia, tendencia)
+
+---
+
+## Fase futura — Visualización 3D interactiva
+
+Prerequisito: Fases 7–8 completadas (curvas cinemáticas + timeline funcional).
+
+> **Nota:** esta fase se abordará cuando el análisis biomecánico y la visualización 2D estén sólidos. Un visor 3D sin datos completos detrás sería un envoltorio sin contenido.
+
+- [ ] Esqueleto animado del salto (replay de landmarks en 3D)
+- [ ] Visor interactivo con rotación/zoom (React + Three.js o similar)
+- [ ] Comparación lado a lado de dos intentos
+- [ ] Trayectorias y ángulos en escena 3D
+- [ ] Overlay técnico sobre el modelo (ángulos, fases, alertas)

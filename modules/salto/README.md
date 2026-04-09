@@ -90,11 +90,11 @@ Content-Type: multipart/form-data
 Vídeo grabado (.mp4 / .webm)
       │  Upload via POST
       ▼
-VideoProcessor        (Model)       — MediaPipe PoseLandmarker, extrae pies por frame
+VideoProcessor        (Modelo)      — MediaPipe PoseLandmarker, extrae pies por frame
       │
-CalculoService        (Service)     — fórmulas de cinemática y calibración
+CalculoService        (Servicio)    — fórmulas de cinemática y calibración
       │
-SaltoController       (Controller)  — orquesta modelo + servicio
+SaltoController       (Controlador) — orquesta modelo + servicio
       │
 Flask app.py          (API)         — POST /api/salto/calcular → JSON
                                         ↕
