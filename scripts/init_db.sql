@@ -29,6 +29,11 @@ CREATE TABLE IF NOT EXISTS saltos (
     distancia_cm  INT           NOT NULL,
     tiempo_vuelo_s DECIMAL(6,3) NULL,
     confianza_ia  DECIMAL(4,3)  NULL,
+    potencia_w    DECIMAL(8,2)  NULL,
+    asimetria_pct DECIMAL(6,2)  NULL,
+    angulo_rodilla_deg DECIMAL(6,2) NULL,
+    angulo_cadera_deg  DECIMAL(6,2) NULL,
+    estabilidad_aterrizaje DECIMAL(6,3) NULL,
     metodo_origen ENUM('ia_vivo','video_galeria','sensor_arduino') DEFAULT 'video_galeria',
     fecha_salto   DATETIME      DEFAULT CURRENT_TIMESTAMP,
 
@@ -55,6 +60,68 @@ SET @sql = IF(@col_exists = 0,
     'ALTER TABLE usuarios ADD COLUMN peso_kg DECIMAL(5,1) NULL AFTER altura_m',
     'SELECT 1');
 
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ── Migraciones: columnas avanzadas de saltos (analítica fase 9/10) ──
+
+SET @col_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'saltos' AND COLUMN_NAME = 'potencia_w'
+);
+SET @sql = IF(@col_exists = 0,
+    'ALTER TABLE saltos ADD COLUMN potencia_w DECIMAL(8,2) NULL AFTER confianza_ia',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'saltos' AND COLUMN_NAME = 'asimetria_pct'
+);
+SET @sql = IF(@col_exists = 0,
+    'ALTER TABLE saltos ADD COLUMN asimetria_pct DECIMAL(6,2) NULL AFTER potencia_w',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'saltos' AND COLUMN_NAME = 'angulo_rodilla_deg'
+);
+SET @sql = IF(@col_exists = 0,
+    'ALTER TABLE saltos ADD COLUMN angulo_rodilla_deg DECIMAL(6,2) NULL AFTER asimetria_pct',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'saltos' AND COLUMN_NAME = 'angulo_cadera_deg'
+);
+SET @sql = IF(@col_exists = 0,
+    'ALTER TABLE saltos ADD COLUMN angulo_cadera_deg DECIMAL(6,2) NULL AFTER angulo_rodilla_deg',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'saltos' AND COLUMN_NAME = 'estabilidad_aterrizaje'
+);
+SET @sql = IF(@col_exists = 0,
+    'ALTER TABLE saltos ADD COLUMN estabilidad_aterrizaje DECIMAL(6,3) NULL AFTER angulo_cadera_deg',
+    'SELECT 1'
+);
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;

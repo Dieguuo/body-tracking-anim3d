@@ -12,6 +12,7 @@ Rutas:
     GET    /api/usuarios/<id>/comparativa → Comparativa intra-usuario
     GET    /api/usuarios/<id>/fatiga      → Fatiga intra-sesión
     GET    /api/usuarios/<id>/tendencia   → Tendencia histórica
+    GET    /api/usuarios/<id>/alertas_tendencia → Alertas entre sesiones
 """
 
 from flask import Blueprint, jsonify, request
@@ -22,14 +23,24 @@ from models.salto_model import SaltoModel
 from services.comparativa_service import calcular_progreso, calcular_comparativa
 from services.analitica_service import (
     TIPOS_SALTO_VALIDOS,
+    calcular_alertas_tendencia,
+    calcular_comparativa_sesiones,
+    calcular_correlaciones,
+    calcular_evolucion_asimetria,
     calcular_fatiga_intra_sesion,
+    comparar_tipos_usuario,
     calcular_tendencia_historial,
+    detectar_estancamiento_mejora,
+    prediccion_multivariable_usuario,
+    ranking_mejores_sesiones,
 )
 
 usuarios_bp = Blueprint("usuarios", __name__)
 
 _usuario_model = UsuarioModel()
 _salto_model = SaltoModel()
+
+METRICAS_TENDENCIA_VALIDAS = {"distancia", "potencia_estimada"}
 
 
 def _leer_tipo_salto(default: str = "vertical"):
@@ -251,8 +262,18 @@ def tendencia(id_usuario):
     if error_response:
         return error_response, status
 
+    metrica = (request.args.get("metrica") or "distancia").strip().lower()
+    if metrica not in METRICAS_TENDENCIA_VALIDAS:
+        return jsonify({"error": f"metrica debe ser: {', '.join(sorted(METRICAS_TENDENCIA_VALIDAS))}"}), 400
+
+    peso_kg = usuario.get("peso_kg")
+    try:
+        peso_kg = float(peso_kg) if peso_kg is not None else None
+    except (ValueError, TypeError):
+        peso_kg = None
+
     saltos = _salto_model.obtener_por_usuario_y_tipo(id_usuario, tipo)
-    resultado = calcular_tendencia_historial(saltos)
+    resultado = calcular_tendencia_historial(saltos, metrica=metrica, peso_kg=peso_kg)
 
     return jsonify({
         "id_usuario": id_usuario,
@@ -260,3 +281,91 @@ def tendencia(id_usuario):
         "tipo_salto": tipo,
         **resultado,
     })
+
+
+@usuarios_bp.route("/api/usuarios/<int:id_usuario>/alertas_tendencia", methods=["GET"])
+def alertas_tendencia(id_usuario):
+    usuario = _usuario_model.obtener_por_id(id_usuario)
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    tipo, error_response, status = _leer_tipo_salto(default="vertical")
+    if error_response:
+        return error_response, status
+
+    saltos = _salto_model.obtener_por_usuario_y_tipo(id_usuario, tipo)
+    peso_kg = usuario.get("peso_kg")
+    try:
+        peso_kg = float(peso_kg) if peso_kg is not None else None
+    except (ValueError, TypeError):
+        peso_kg = None
+
+    alertas = calcular_alertas_tendencia(saltos, peso_kg=peso_kg)
+    return jsonify({
+        "id_usuario": id_usuario,
+        "alias": usuario["alias"],
+        "tipo_salto": tipo,
+        "alertas": alertas,
+    })
+
+
+@usuarios_bp.route("/api/usuarios/<int:id_usuario>/analitica_avanzada", methods=["GET"])
+def analitica_avanzada(id_usuario):
+    usuario = _usuario_model.obtener_por_id(id_usuario)
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    tipo, error_response, status = _leer_tipo_salto(default="vertical")
+    if error_response:
+        return error_response, status
+
+    metrica = (request.args.get("metrica") or "distancia").strip().lower()
+    metricas_validas = {"distancia", "potencia_estimada", "asimetria", "estabilidad"}
+    if metrica not in metricas_validas:
+        return jsonify({"error": f"metrica debe ser: {', '.join(sorted(metricas_validas))}"}), 400
+
+    peso_kg = usuario.get("peso_kg")
+    try:
+        peso_kg = float(peso_kg) if peso_kg is not None else None
+    except (ValueError, TypeError):
+        peso_kg = None
+
+    saltos_tipo = _salto_model.obtener_historial_analitica_usuario(id_usuario, tipo_salto=tipo)
+    saltos_vertical = _salto_model.obtener_historial_analitica_usuario(id_usuario, tipo_salto="vertical")
+    saltos_horizontal = _salto_model.obtener_historial_analitica_usuario(id_usuario, tipo_salto="horizontal")
+    historial_global = _salto_model.obtener_historial_analitica_global(tipo_salto=tipo)
+
+    payload = {
+        "id_usuario": id_usuario,
+        "alias": usuario["alias"],
+        "tipo_salto": tipo,
+        "metrica": metrica,
+        "asimetria_evolucion": calcular_evolucion_asimetria(saltos_tipo),
+        "comparativa_sesiones": calcular_comparativa_sesiones(
+            saltos_tipo,
+            metrica=metrica,
+            peso_kg=peso_kg,
+            max_sesiones=2,
+        ),
+        "correlaciones": calcular_correlaciones(historial_global),
+        "estancamiento_mejora": detectar_estancamiento_mejora(
+            saltos_tipo,
+            metrica=metrica,
+            peso_kg=peso_kg,
+        ),
+        "rankings": {
+            "top_sesiones": ranking_mejores_sesiones(historial_global, tipo_salto=tipo, top_n=5),
+        },
+        "comparativa_tipos": comparar_tipos_usuario(
+            saltos_vertical,
+            saltos_horizontal,
+            peso_kg,
+        ),
+        "prediccion_multivariable": prediccion_multivariable_usuario(
+            saltos_tipo,
+            peso_kg,
+            semanas_prediccion=4.0,
+        ),
+    }
+
+    return jsonify(payload)

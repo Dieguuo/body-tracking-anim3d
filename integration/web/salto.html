@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medición de Salto</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=20260409b">
 </head>
 <body class="salto-page">
     <div id="toast-aviso" class="toast-aviso" aria-live="polite"></div>
@@ -99,16 +99,24 @@
             </div>
 
             <div id="usuario-estado" class="sensor-nota">Sin usuario activo.</div>
+            <a href="videos.html" class="sensor-btn secondary-btn biblioteca-link">Abrir biblioteca de vídeos</a>
 
             <div class="analitica-panel">
                 <div class="analitica-header">
                     <h3 class="analitica-titulo">Evolución y fatiga</h3>
-                    <button id="btn-actualizar-analitica" class="sensor-btn ghost-btn analitica-refresh" type="button">Actualizar</button>
+                    <div class="analitica-tools">
+                        <select id="metrica-analitica" class="modern-input analitica-select">
+                            <option value="distancia" selected>Distancia</option>
+                            <option value="potencia_estimada">Potencia estimada</option>
+                        </select>
+                        <button id="btn-actualizar-analitica" class="sensor-btn ghost-btn analitica-refresh" type="button">Actualizar</button>
+                    </div>
                 </div>
 
                 <p id="analitica-estado" class="sensor-nota">Selecciona un usuario para ver su tendencia.</p>
 
                 <div id="fatiga-alerta" class="fatiga-alerta" style="display:none;"></div>
+                <div id="alertas-tendencia" class="alertas-tendencia" style="display:none;"></div>
 
                 <div class="analitica-metricas">
                     <div class="metrica-item">
@@ -137,8 +145,53 @@
                     </div>
                 </div>
 
-                <div class="analitica-grafica-wrap">
-                    <canvas id="grafica-tendencia" height="190"></canvas>
+                <div class="analitica-grafica-wrap" id="wrap-grafica-tendencia">
+                    <canvas id="grafica-tendencia"></canvas>
+                </div>
+
+                <div class="analitica-grafica-wrap analitica-grafica-wrap-advanced" id="wrap-grafica-asimetria">
+                    <p class="analitica-grafica-title">Evolución de asimetría</p>
+                    <canvas id="grafica-asimetria"></canvas>
+                    <p id="empty-grafica-asimetria" class="analitica-empty-text" style="display:none;">No hay datos de asimetría suficientes para graficar.</p>
+                </div>
+
+                <div class="analitica-grafica-wrap analitica-grafica-wrap-advanced" id="wrap-grafica-corr-peso-potencia">
+                    <p class="analitica-grafica-title">Correlación peso vs potencia</p>
+                    <canvas id="grafica-corr-peso-potencia"></canvas>
+                    <p id="empty-grafica-corr-peso-potencia" class="analitica-empty-text" style="display:none;">No hay muestras suficientes para esta correlación.</p>
+                </div>
+
+                <div class="analitica-grafica-wrap analitica-grafica-wrap-advanced" id="wrap-grafica-corr-asim-estabilidad">
+                    <p class="analitica-grafica-title">Correlación asimetría vs estabilidad</p>
+                    <canvas id="grafica-corr-asim-estabilidad"></canvas>
+                    <p id="empty-grafica-corr-asim-estabilidad" class="analitica-empty-text" style="display:none;">Aún no hay datos de asimetría/estabilidad suficientes.</p>
+                </div>
+
+                <div class="analitica-avanzada-grid">
+                    <div class="metrica-item metrica-item-wide">
+                        <span class="metrica-label">Comparativa sesiones</span>
+                        <strong id="sesiones-resumen">--</strong>
+                    </div>
+                    <div class="metrica-item metrica-item-wide">
+                        <span class="metrica-label">Correlaciones</span>
+                        <strong id="correlaciones-resumen">--</strong>
+                    </div>
+                    <div class="metrica-item metrica-item-wide">
+                        <span class="metrica-label">Estancamiento / mejora</span>
+                        <strong id="estancamiento-resumen">--</strong>
+                    </div>
+                    <div class="metrica-item metrica-item-wide">
+                        <span class="metrica-label">Comparativa vertical vs horizontal</span>
+                        <strong id="comparativa-tipos-resumen">--</strong>
+                    </div>
+                    <div class="metrica-item metrica-item-wide">
+                        <span class="metrica-label">Predicción multivariable</span>
+                        <strong id="prediccion-multi-resumen">--</strong>
+                    </div>
+                    <div class="metrica-item metrica-item-wide">
+                        <span class="metrica-label">Ranking sesiones</span>
+                        <strong id="ranking-resumen">--</strong>
+                    </div>
                 </div>
             </div>
         </div>
@@ -184,16 +237,32 @@
                     <span class="data-label">Asimetría</span>
                     <span id="data-asimetria" class="data-value">-- %</span>
                 </div>
+                <div class="data-box">
+                    <span class="data-label">Estabilidad</span>
+                    <span id="data-estabilidad" class="data-value">--</span>
+                </div>
+            </div>
+
+            <div id="clasificacion-salto" class="clasificacion-salto">Clasificación: --</div>
+
+            <div id="alertas-salto-panel" class="insights-panel" style="display:none;">
+                <h3 class="insights-title">Alertas biomecánicas</h3>
+                <ul id="lista-alertas-salto" class="insights-list"></ul>
+            </div>
+
+            <div id="observaciones-panel" class="insights-panel" style="display:none;">
+                <h3 class="insights-title">Observaciones automáticas</h3>
+                <ul id="lista-observaciones" class="insights-list"></ul>
             </div>
 
             <button id="btn-reintentar" class="primary-btn-large">Nuevo Salto</button>
         </div>
     </div>
 
-    <script src="js/config.js"></script>
-    <script src="js/camara.js"></script>
-    <script src="js/registro.js"></script>
+    <script src="js/config.js?v=20260409b"></script>
+    <script src="js/camara.js?v=20260409b"></script>
+    <script src="js/registro.js?v=20260409b"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-    <script type="module" src="js/api_salto.js"></script>
+    <script type="module" src="js/api_salto.js?v=20260409b"></script>
 </body>
 </html>

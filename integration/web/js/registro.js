@@ -173,9 +173,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const alias = document.getElementById('alias').value.trim();
             const nombreCompleto = document.getElementById('nombre_completo').value.trim();
             const alturaM = parseFloat(document.getElementById('altura_m').value);
+            const pesoRaw = (document.getElementById('peso_kg')?.value || '').trim();
+            const pesoKg = pesoRaw ? parseFloat(pesoRaw) : null;
 
             if (isNaN(alturaM) || alturaM < 0.50 || alturaM > 2.50) {
                 mensajeEstado.textContent = 'La altura debe estar entre 0.50 y 2.50 metros.';
+                mensajeEstado.style.color = '#ffb020';
+                return;
+            }
+
+            if (pesoKg !== null && (Number.isNaN(pesoKg) || pesoKg < 20 || pesoKg > 300)) {
+                mensajeEstado.textContent = 'El peso debe estar entre 20 y 300 kg.';
                 mensajeEstado.style.color = '#ffb020';
                 return;
             }
@@ -186,12 +194,13 @@ document.addEventListener('DOMContentLoaded', () => {
             mensajeEstado.textContent = '';
 
             try {
-                const idUsuario = await crearUsuario(alias, nombreCompleto, alturaM);
+                const idUsuario = await crearUsuario(alias, nombreCompleto, alturaM, pesoKg);
                 setUsuarioActivo({
                     id_usuario: idUsuario,
                     alias: alias,
                     nombre_completo: nombreCompleto,
-                    altura_m: alturaM
+                    altura_m: alturaM,
+                    peso_kg: pesoKg,
                 });
 
                 mensajeEstado.textContent = 'Usuario registrado correctamente.';
@@ -293,7 +302,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 id_usuario: u.id_usuario,
                 alias: u.alias,
                 nombre_completo: u.nombre_completo,
-                altura_m: Number(u.altura_m)
+                altura_m: Number(u.altura_m),
+                peso_kg: u.peso_kg != null ? Number(u.peso_kg) : null,
             });
         }
 
@@ -316,7 +326,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 id_usuario: u.id_usuario,
                 alias: u.alias,
                 nombre_completo: u.nombre_completo,
-                altura_m: Number(u.altura_m)
+                altura_m: Number(u.altura_m),
+                peso_kg: u.peso_kg != null ? Number(u.peso_kg) : null,
             });
         });
 

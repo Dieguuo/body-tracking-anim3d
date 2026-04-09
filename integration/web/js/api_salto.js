@@ -27,6 +27,7 @@ let angulosDespegueActual = {
     angulo_rodilla_deg: null,
     angulo_cadera_deg: null
 };
+let asimetriaDespegueActual = null;
 
 let mediaRecorder = null;
 let chunksGrabacion = [];
@@ -36,7 +37,39 @@ let toastTimer = null;
 const SALTOS_OBJETIVO_COMPARATIVA = 4;
 let medidasComparativa = [];
 let graficaTendencia = null;
+let graficaAsimetria = null;
+let graficaCorrPesoPotencia = null;
+let graficaCorrAsimEstabilidad = null;
 let ultimaAlertaFatigaClave = '';
+const CHART_BOX_HEIGHT_PX = 220;
+
+function fijarTamanoGraficasAnalitica() {
+    const wrapperIds = [
+        'wrap-grafica-tendencia',
+        'wrap-grafica-asimetria',
+        'wrap-grafica-corr-peso-potencia',
+        'wrap-grafica-corr-asim-estabilidad'
+    ];
+
+    wrapperIds.forEach((id) => {
+        const wrapper = document.getElementById(id);
+        if (!wrapper) {
+            return;
+        }
+        const h = `${CHART_BOX_HEIGHT_PX}px`;
+        wrapper.style.setProperty('height', h, 'important');
+        wrapper.style.setProperty('min-height', h, 'important');
+        wrapper.style.setProperty('max-height', h, 'important');
+        wrapper.style.setProperty('overflow', 'hidden', 'important');
+
+        const canvas = wrapper.querySelector('canvas');
+        if (canvas) {
+            canvas.style.setProperty('height', '100%', 'important');
+            canvas.style.setProperty('max-height', '100%', 'important');
+            canvas.style.setProperty('width', '100%', 'important');
+        }
+    });
+}
 
 // getBackendBaseUrl() se carga desde js/config.js
 
@@ -76,6 +109,80 @@ function getPreferenciaGuardarVideoTiempoReal() {
 function getModoAnalisis() {
     const selector = document.getElementById('modo-analisis');
     return selector ? selector.value : 'individual';
+}
+
+function getMetricaAnalitica() {
+    const selector = document.getElementById('metrica-analitica');
+    return selector ? selector.value : 'distancia';
+}
+
+function getPesoUsuarioActivo() {
+    const raw = sessionStorage.getItem('pesoUser');
+    const peso = Number(raw);
+    return Number.isFinite(peso) && peso > 0 ? peso : null;
+}
+
+function calcularPotenciaVerticalLocal(alturaCm) {
+    const peso = getPesoUsuarioActivo();
+    const altura = Number(alturaCm);
+    if (!Number.isFinite(altura) || altura <= 0 || !peso) {
+        return null;
+    }
+    const potencia = (60.7 * altura) + (45.3 * peso) - 2055;
+    return Number.isFinite(potencia) ? Number(potencia.toFixed(1)) : null;
+}
+
+function calcularPotenciaHorizontalLocal(distanciaCm, tiempoVueloS) {
+    const peso = getPesoUsuarioActivo();
+    const distanciaM = Number(distanciaCm) / 100;
+    const t = Number(tiempoVueloS);
+    if (!peso || !Number.isFinite(distanciaM) || distanciaM <= 0 || !Number.isFinite(t) || t <= 0) {
+        return null;
+    }
+
+    const g = 9.81;
+    const vx = distanciaM / t;
+    const vy = (g * t) / 2;
+    const energiaJ = 0.5 * peso * ((vx * vx) + (vy * vy));
+    const tImpulso = Math.min(0.35, Math.max(0.18, 0.45 * t));
+    if (!(tImpulso > 0)) {
+        return null;
+    }
+
+    const potencia = energiaJ / tImpulso;
+    return Number.isFinite(potencia) && potencia > 0 ? Number(potencia.toFixed(1)) : null;
+}
+
+function calcularPotenciaLocal(tipoSalto, distanciaCm, tiempoVueloS) {
+    if (String(tipoSalto || '').toLowerCase() === 'horizontal') {
+        return calcularPotenciaHorizontalLocal(distanciaCm, tiempoVueloS);
+    }
+    return calcularPotenciaVerticalLocal(distanciaCm);
+}
+
+function calcularEstabilidadLocal(asimetriaPct, confianza) {
+    const asim = Number.isFinite(Number(asimetriaPct)) ? Number(asimetriaPct) : 8.0;
+    const conf = Number.isFinite(Number(confianza)) ? Number(confianza) : 0.9;
+    const penalizacionAsim = Math.min(45, asim * 2);
+    const penalizacionConf = Math.max(0, (1 - conf) * 35);
+    const score = 100 - penalizacionAsim - penalizacionConf;
+    return Number(Math.max(0, Math.min(100, score)).toFixed(2));
+}
+
+function calcularAsimetriaDesdeLandmarks(landmarks) {
+    if (!Array.isArray(landmarks) || landmarks.length < 31) {
+        return null;
+    }
+
+    const izq = normalizarNumeroOpcional(landmarks?.[29]?.y ?? landmarks?.[27]?.y);
+    const der = normalizarNumeroOpcional(landmarks?.[30]?.y ?? landmarks?.[28]?.y);
+    if (izq === null || der === null) {
+        return null;
+    }
+
+    const maximo = Math.max(Math.abs(izq), Math.abs(der), 1e-6);
+    const asi = (Math.abs(izq - der) / maximo) * 100;
+    return Number.isFinite(asi) ? Number(asi.toFixed(1)) : null;
 }
 
 function mostrarToast(mensaje, tipo = 'info', duracionMs = 2200) {
@@ -208,6 +315,27 @@ function asignarTexto(id, texto) {
     }
 }
 
+function actualizarEstadoGrafica({ wrapperId, canvasId, emptyId, hasData, emptyMessage }) {
+    const wrapper = document.getElementById(wrapperId);
+    const canvas = document.getElementById(canvasId);
+    const empty = document.getElementById(emptyId);
+
+    if (wrapper) {
+        wrapper.classList.toggle('is-empty', !hasData);
+    }
+
+    if (canvas) {
+        canvas.style.display = hasData ? 'block' : 'none';
+    }
+
+    if (empty) {
+        if (!hasData && emptyMessage) {
+            empty.textContent = emptyMessage;
+        }
+        empty.style.display = hasData ? 'none' : 'block';
+    }
+}
+
 function limpiarAnaliticaPanel(mensaje = 'Selecciona un usuario para ver su tendencia.') {
     asignarTexto('analitica-estado', mensaje);
     asignarTexto('metrica-pendiente-historial', '-- cm/sem');
@@ -216,6 +344,12 @@ function limpiarAnaliticaPanel(mensaje = 'Selecciona un usuario para ver su tend
     asignarTexto('metrica-estado', '--');
     asignarTexto('metrica-pendiente-sesion', '-- cm/salto');
     asignarTexto('metrica-caida', '--%');
+    asignarTexto('sesiones-resumen', '--');
+    asignarTexto('correlaciones-resumen', '--');
+    asignarTexto('estancamiento-resumen', '--');
+    asignarTexto('comparativa-tipos-resumen', '--');
+    asignarTexto('prediccion-multi-resumen', '--');
+    asignarTexto('ranking-resumen', '--');
 
     const alerta = document.getElementById('fatiga-alerta');
     if (alerta) {
@@ -223,15 +357,73 @@ function limpiarAnaliticaPanel(mensaje = 'Selecciona un usuario para ver su tend
         alerta.textContent = '';
     }
 
+    const alertasTendencia = document.getElementById('alertas-tendencia');
+    if (alertasTendencia) {
+        alertasTendencia.style.display = 'none';
+        alertasTendencia.textContent = '';
+    }
+
     const canvas = document.getElementById('grafica-tendencia');
     if (graficaTendencia) {
         graficaTendencia.destroy();
         graficaTendencia = null;
     }
+    if (graficaAsimetria) {
+        graficaAsimetria.destroy();
+        graficaAsimetria = null;
+    }
+    if (graficaCorrPesoPotencia) {
+        graficaCorrPesoPotencia.destroy();
+        graficaCorrPesoPotencia = null;
+    }
+    if (graficaCorrAsimEstabilidad) {
+        graficaCorrAsimEstabilidad.destroy();
+        graficaCorrAsimEstabilidad = null;
+    }
     if (canvas) {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
+
+    const canvasAsim = document.getElementById('grafica-asimetria');
+    if (canvasAsim) {
+        const ctxAsim = canvasAsim.getContext('2d');
+        ctxAsim.clearRect(0, 0, canvasAsim.width, canvasAsim.height);
+    }
+
+    const canvasCorr1 = document.getElementById('grafica-corr-peso-potencia');
+    if (canvasCorr1) {
+        const ctxCorr1 = canvasCorr1.getContext('2d');
+        ctxCorr1.clearRect(0, 0, canvasCorr1.width, canvasCorr1.height);
+    }
+
+    const canvasCorr2 = document.getElementById('grafica-corr-asim-estabilidad');
+    if (canvasCorr2) {
+        const ctxCorr2 = canvasCorr2.getContext('2d');
+        ctxCorr2.clearRect(0, 0, canvasCorr2.width, canvasCorr2.height);
+    }
+
+    actualizarEstadoGrafica({
+        wrapperId: 'wrap-grafica-asimetria',
+        canvasId: 'grafica-asimetria',
+        emptyId: 'empty-grafica-asimetria',
+        hasData: false,
+        emptyMessage: 'No hay datos de asimetria suficientes para graficar.'
+    });
+    actualizarEstadoGrafica({
+        wrapperId: 'wrap-grafica-corr-peso-potencia',
+        canvasId: 'grafica-corr-peso-potencia',
+        emptyId: 'empty-grafica-corr-peso-potencia',
+        hasData: false,
+        emptyMessage: 'No hay muestras suficientes para esta correlacion.'
+    });
+    actualizarEstadoGrafica({
+        wrapperId: 'wrap-grafica-corr-asim-estabilidad',
+        canvasId: 'grafica-corr-asim-estabilidad',
+        emptyId: 'empty-grafica-corr-asim-estabilidad',
+        hasData: false,
+        emptyMessage: 'Aun no hay datos de asimetria/estabilidad suficientes.'
+    });
 }
 
 function capitalizarEstado(estado) {
@@ -241,7 +433,8 @@ function capitalizarEstado(estado) {
     return `${estado.charAt(0).toUpperCase()}${estado.slice(1)}`;
 }
 
-function renderGraficaTendencia(historial, tipo) {
+function renderGraficaTendencia(historial, tipo, metrica = 'distancia', unidad = 'cm') {
+    fijarTamanoGraficasAnalitica();
     const canvas = document.getElementById('grafica-tendencia');
     if (!canvas || !window.Chart || !Array.isArray(historial)) {
         return;
@@ -258,8 +451,9 @@ function renderGraficaTendencia(historial, tipo) {
         });
     });
 
-    const valoresReales = historial.map((p) => Number(p.distancia_cm || 0));
-    const valoresTendencia = historial.map((p) => Number(p.tendencia_cm || 0));
+    const valoresReales = historial.map((p) => Number(p.valor ?? p.distancia_cm ?? 0));
+    const valoresTendencia = historial.map((p) => Number(p.tendencia_valor ?? p.tendencia_cm ?? 0));
+    const tituloMetrica = metrica === 'potencia_estimada' ? 'Potencia estimada' : 'Distancia';
 
     if (graficaTendencia) {
         graficaTendencia.destroy();
@@ -272,7 +466,7 @@ function renderGraficaTendencia(historial, tipo) {
             labels,
             datasets: [
                 {
-                    label: `Saltos ${normalizarTextoTipo(tipo)}`,
+                    label: `${tituloMetrica} ${normalizarTextoTipo(tipo)}`,
                     data: valoresReales,
                     borderColor: '#59ffc7',
                     backgroundColor: 'rgba(89, 255, 199, 0.16)',
@@ -313,25 +507,395 @@ function renderGraficaTendencia(historial, tipo) {
                     grid: { color: 'rgba(255,255,255,0.08)' },
                     title: {
                         display: true,
-                        text: 'Distancia (cm)',
+                        text: `${tituloMetrica} (${unidad})`,
                         color: '#c9b8da'
                     }
                 }
             }
         }
     });
+    fijarTamanoGraficasAnalitica();
 }
 
-function actualizarPanelAnalitica(tendencia, fatiga, tipo) {
+function renderGraficaAsimetria(payload) {
+    fijarTamanoGraficasAnalitica();
+    const canvas = document.getElementById('grafica-asimetria');
+    const historial = Array.isArray(payload?.historial) ? payload.historial : [];
+    if (!canvas || !window.Chart || historial.length === 0) {
+        if (graficaAsimetria) {
+            graficaAsimetria.destroy();
+            graficaAsimetria = null;
+        }
+        actualizarEstadoGrafica({
+            wrapperId: 'wrap-grafica-asimetria',
+            canvasId: 'grafica-asimetria',
+            emptyId: 'empty-grafica-asimetria',
+            hasData: false,
+            emptyMessage: 'No hay datos de asimetria suficientes para graficar.'
+        });
+        return;
+    }
+
+    const labels = historial.map((punto, idx) => {
+        const fecha = new Date(punto.fecha);
+        if (Number.isNaN(fecha.getTime())) {
+            return `Salto ${idx + 1}`;
+        }
+        return fecha.toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit'
+        });
+    });
+
+    const valores = historial.map((p) => Number(p.asimetria_pct ?? 0));
+    const tendencia = historial.map((p) => Number(p.tendencia_asimetria_pct ?? 0));
+
+    if (graficaAsimetria) {
+        graficaAsimetria.destroy();
+        graficaAsimetria = null;
+    }
+
+    graficaAsimetria = new window.Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Asimetría (%)',
+                    data: valores,
+                    borderColor: '#ffd666',
+                    backgroundColor: 'rgba(255, 214, 102, 0.18)',
+                    pointRadius: 3,
+                    tension: 0.26,
+                    fill: true
+                },
+                {
+                    label: 'Tendencia asimetría',
+                    data: tendencia,
+                    borderColor: '#ff9f6e',
+                    borderDash: [7, 5],
+                    pointRadius: 0,
+                    tension: 0,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#ffffff',
+                        boxWidth: 10,
+                        boxHeight: 10
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#c9b8da' },
+                    grid: { color: 'rgba(255,255,255,0.08)' }
+                },
+                y: {
+                    ticks: { color: '#c9b8da' },
+                    grid: { color: 'rgba(255,255,255,0.08)' },
+                    title: {
+                        display: true,
+                        text: 'Asimetría (%)',
+                        color: '#c9b8da'
+                    }
+                }
+            }
+        }
+    });
+    fijarTamanoGraficasAnalitica();
+
+    actualizarEstadoGrafica({
+        wrapperId: 'wrap-grafica-asimetria',
+        canvasId: 'grafica-asimetria',
+        emptyId: 'empty-grafica-asimetria',
+        hasData: true
+    });
+}
+
+function renderGraficaCorrelaciones(payload) {
+    fijarTamanoGraficasAnalitica();
+    const canvasPesoPot = document.getElementById('grafica-corr-peso-potencia');
+    const canvasAsimEst = document.getElementById('grafica-corr-asim-estabilidad');
+
+    function percentil(valores, p) {
+        if (!Array.isArray(valores) || valores.length === 0) {
+            return null;
+        }
+        const arr = valores
+            .map((v) => Number(v))
+            .filter((v) => Number.isFinite(v))
+            .sort((a, b) => a - b);
+        if (arr.length === 0) {
+            return null;
+        }
+        const idx = Math.max(0, Math.min(arr.length - 1, Math.floor((arr.length - 1) * p)));
+        return arr[idx];
+    }
+
+    function limiteSuperiorRobusto(valores, { min = 100, max = 3000, p = 0.92, margen = 1.25 } = {}) {
+        const pVal = percentil(valores, p);
+        if (!Number.isFinite(pVal)) {
+            return max;
+        }
+        const limite = pVal * margen;
+        return Math.max(min, Math.min(max, limite));
+    }
+
+    const puntosPesoPot = Array.isArray(payload?.correlaciones?.peso_potencia_distancia?.puntos)
+        ? payload.correlaciones.peso_potencia_distancia.puntos
+        : [];
+    const puntosAsimEst = Array.isArray(payload?.correlaciones?.asimetria_estabilidad?.puntos)
+        ? payload.correlaciones.asimetria_estabilidad.puntos
+        : [];
+
+    if (!window.Chart) {
+        return;
+    }
+
+    if (graficaCorrPesoPotencia) {
+        graficaCorrPesoPotencia.destroy();
+        graficaCorrPesoPotencia = null;
+    }
+    if (graficaCorrAsimEstabilidad) {
+        graficaCorrAsimEstabilidad.destroy();
+        graficaCorrAsimEstabilidad = null;
+    }
+
+    if (canvasPesoPot && puntosPesoPot.length > 0) {
+        const datosPesoPotRaw = puntosPesoPot
+            .map((p) => ({ x: Number(p.peso_kg), y: Number(p.potencia_w) }))
+            .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && p.x > 0 && p.y > 0);
+
+        const maxPotVisual = limiteSuperiorRobusto(
+            datosPesoPotRaw.map((p) => p.y),
+            { min: 900, max: 3200, p: 0.90, margen: 1.2 }
+        );
+
+        const datosPesoPotVisual = datosPesoPotRaw.map((p) => ({
+            x: p.x,
+            y: Math.min(p.y, maxPotVisual)
+        }));
+
+        graficaCorrPesoPotencia = new window.Chart(canvasPesoPot.getContext('2d'), {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    {
+                        label: 'Peso vs Potencia',
+                        data: datosPesoPotVisual,
+                        backgroundColor: 'rgba(89, 255, 199, 0.65)'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    x: {
+                        ticks: { color: '#c9b8da' },
+                        title: { display: true, text: 'Peso (kg)', color: '#c9b8da' },
+                        grid: { color: 'rgba(255,255,255,0.08)' }
+                    },
+                    y: {
+                        ticks: { color: '#c9b8da' },
+                        title: { display: true, text: 'Potencia (W)', color: '#c9b8da' },
+                        grid: { color: 'rgba(255,255,255,0.08)' },
+                        min: 0,
+                        max: maxPotVisual
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: '#ffffff' }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                const raw = datosPesoPotRaw[ctx.dataIndex];
+                                if (!raw) {
+                                    return '';
+                                }
+                                const truncado = raw.y > maxPotVisual;
+                                return `Peso ${raw.x.toFixed(1)} kg · Potencia ${raw.y.toFixed(1)} W${truncado ? ' (cap visual)' : ''}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        fijarTamanoGraficasAnalitica();
+        actualizarEstadoGrafica({
+            wrapperId: 'wrap-grafica-corr-peso-potencia',
+            canvasId: 'grafica-corr-peso-potencia',
+            emptyId: 'empty-grafica-corr-peso-potencia',
+            hasData: true
+        });
+    } else {
+        actualizarEstadoGrafica({
+            wrapperId: 'wrap-grafica-corr-peso-potencia',
+            canvasId: 'grafica-corr-peso-potencia',
+            emptyId: 'empty-grafica-corr-peso-potencia',
+            hasData: false,
+            emptyMessage: 'No hay muestras suficientes para esta correlacion.'
+        });
+    }
+
+    if (canvasAsimEst && puntosAsimEst.length > 0) {
+        const datosAsimEst = puntosAsimEst
+            .map((p) => ({
+                x: Number(p.asimetria_pct),
+                y: Number(p.estabilidad_aterrizaje)
+            }))
+            .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+
+        const maxAsimVisual = limiteSuperiorRobusto(
+            datosAsimEst.map((p) => p.x),
+            { min: 12, max: 45, p: 0.92, margen: 1.15 }
+        );
+
+        graficaCorrAsimEstabilidad = new window.Chart(canvasAsimEst.getContext('2d'), {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    {
+                        label: 'Asimetria vs Estabilidad',
+                        data: datosAsimEst,
+                        backgroundColor: 'rgba(255, 159, 110, 0.7)'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    x: {
+                        ticks: { color: '#c9b8da' },
+                        title: { display: true, text: 'Asimetria (%)', color: '#c9b8da' },
+                        grid: { color: 'rgba(255,255,255,0.08)' },
+                        min: 0,
+                        max: maxAsimVisual
+                    },
+                    y: {
+                        ticks: { color: '#c9b8da' },
+                        title: { display: true, text: 'Estabilidad', color: '#c9b8da' },
+                        grid: { color: 'rgba(255,255,255,0.08)' },
+                        min: 0,
+                        max: 100
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: '#ffffff' }
+                    }
+                }
+            }
+        });
+        fijarTamanoGraficasAnalitica();
+        actualizarEstadoGrafica({
+            wrapperId: 'wrap-grafica-corr-asim-estabilidad',
+            canvasId: 'grafica-corr-asim-estabilidad',
+            emptyId: 'empty-grafica-corr-asim-estabilidad',
+            hasData: true
+        });
+    } else {
+        actualizarEstadoGrafica({
+            wrapperId: 'wrap-grafica-corr-asim-estabilidad',
+            canvasId: 'grafica-corr-asim-estabilidad',
+            emptyId: 'empty-grafica-corr-asim-estabilidad',
+            hasData: false,
+            emptyMessage: 'Aun no hay datos de asimetria/estabilidad suficientes.'
+        });
+    }
+}
+
+function fmt(valor, digits = 2) {
+    const n = Number(valor);
+    return Number.isFinite(n) ? n.toFixed(digits) : '--';
+}
+
+function actualizarPanelAnaliticaAvanzada(payload) {
+    const sesiones = payload?.comparativa_sesiones?.sesiones || [];
+    if (sesiones.length >= 2) {
+        const a = sesiones[0];
+        const b = sesiones[1];
+        const delta = Number(b.media || 0) - Number(a.media || 0);
+        const unidad = payload?.comparativa_sesiones?.unidad || '';
+        asignarTexto(
+            'sesiones-resumen',
+            `Sesion 1: ${fmt(a.media)} ${unidad}\nSesion 2: ${fmt(b.media)} ${unidad}\nVariacion: ${delta >= 0 ? '+' : ''}${fmt(delta)} ${unidad}`
+        );
+    } else {
+        asignarTexto('sesiones-resumen', 'No hay sesiones suficientes para superponer.');
+    }
+
+    const corr1 = payload?.correlaciones?.peso_potencia_distancia || {};
+    const corr2 = payload?.correlaciones?.asimetria_estabilidad || {};
+    asignarTexto(
+        'correlaciones-resumen',
+        `r peso-potencia: ${fmt(corr1.corr_peso_potencia, 3)}\nr potencia-distancia: ${fmt(corr1.corr_potencia_distancia, 3)}\nr asimetria-estabilidad: ${fmt(corr2.corr_asimetria_estabilidad, 3)}`
+    );
+
+    const em = payload?.estancamiento_mejora || {};
+    if (em.suficientes_datos) {
+        let estado = 'estable';
+        if (em.mejora_significativa) estado = 'mejora significativa';
+        if (em.empeora_significativa) estado = 'caida significativa';
+        if (em.estancado) estado = 'estancamiento';
+        asignarTexto('estancamiento-resumen', `Estado: ${estado}\nDelta: ${fmt(em.delta)}\nDelta %: ${fmt(em.delta_pct)}%`);
+    } else {
+        asignarTexto('estancamiento-resumen', em.mensaje || 'No hay datos suficientes.');
+    }
+
+    const ct = payload?.comparativa_tipos || {};
+    const v = ct.vertical || {};
+    const h = ct.horizontal || {};
+    asignarTexto(
+        'comparativa-tipos-resumen',
+        `Vertical: ${fmt(v.distancia_media_cm)} cm\nHorizontal: ${fmt(h.distancia_media_cm)} cm\n${ct.recomendacion || ''}`
+    );
+
+    const pm = payload?.prediccion_multivariable || {};
+    if (pm.suficientes_datos) {
+        asignarTexto(
+            'prediccion-multi-resumen',
+            `Prediccion 4 semanas: ${fmt(pm.prediccion_4_semanas)} cm\nR2: ${fmt(pm.r2, 3)}\nMuestras: ${Number(pm.muestras || 0)}`
+        );
+    } else {
+        asignarTexto('prediccion-multi-resumen', pm.mensaje || 'No hay datos suficientes para prediccion.');
+    }
+
+    const top = payload?.rankings?.top_sesiones || [];
+    if (top.length > 0) {
+        const primeros = top.slice(0, 3).map((t, idx) => `${idx + 1}. ${t.alias || 'Usuario'} - ${fmt(t.media_distancia_cm)} cm`);
+        asignarTexto('ranking-resumen', primeros.join('\n'));
+    } else {
+        asignarTexto('ranking-resumen', 'No hay ranking disponible.');
+    }
+
+    renderGraficaAsimetria(payload?.asimetria_evolucion || {});
+    renderGraficaCorrelaciones(payload || {});
+}
+
+function actualizarPanelAnalitica(tendencia, fatiga, alertasTendencia, tipo) {
     const pendienteHistorial = Number(tendencia.pendiente_cm_semana || tendencia.pendiente || 0);
     const r2 = Number(tendencia.r2 || 0);
     const prediccion = Number(tendencia.prediccion_4_semanas || 0);
     const pendienteSesion = Number(fatiga.pendiente || 0);
     const caidaPct = Number(fatiga.caida_porcentual || 0);
+    const unidad = tendencia.unidad || 'cm';
 
-    asignarTexto('metrica-pendiente-historial', `${pendienteHistorial.toFixed(2)} cm/sem`);
+    asignarTexto('metrica-pendiente-historial', `${pendienteHistorial.toFixed(2)} ${unidad}/sem`);
     asignarTexto('metrica-r2', r2.toFixed(3));
-    asignarTexto('metrica-prediccion', `${prediccion.toFixed(2)} cm`);
+    asignarTexto('metrica-prediccion', `${prediccion.toFixed(2)} ${unidad}`);
     asignarTexto('metrica-estado', capitalizarEstado(tendencia.estado));
     asignarTexto('metrica-pendiente-sesion', `${pendienteSesion.toFixed(2)} cm/salto`);
     asignarTexto('metrica-caida', `${caidaPct.toFixed(2)}% (${Number(fatiga.numero_saltos || 0)} saltos)`);
@@ -360,7 +924,62 @@ function actualizarPanelAnalitica(tendencia, fatiga, tipo) {
         }
     }
 
-    renderGraficaTendencia(tendencia.historial || [], tipo);
+    const panelAlertasTendencia = document.getElementById('alertas-tendencia');
+    if (panelAlertasTendencia) {
+        if (Array.isArray(alertasTendencia) && alertasTendencia.length > 0) {
+            panelAlertasTendencia.style.display = 'block';
+            panelAlertasTendencia.textContent = alertasTendencia.map((a) => `• ${a.mensaje}`).join(' ');
+        } else {
+            panelAlertasTendencia.style.display = 'none';
+            panelAlertasTendencia.textContent = '';
+        }
+    }
+
+    renderGraficaTendencia(tendencia.historial || [], tipo, tendencia.metrica || getMetricaAnalitica(), unidad);
+}
+
+function renderInsightsSalto(datos) {
+    const clasificacionEl = document.getElementById('clasificacion-salto');
+    const alertasPanel = document.getElementById('alertas-salto-panel');
+    const alertasList = document.getElementById('lista-alertas-salto');
+    const obsPanel = document.getElementById('observaciones-panel');
+    const obsList = document.getElementById('lista-observaciones');
+
+    if (clasificacionEl) {
+        const cls = String(datos.clasificacion || '').replace(/_/g, ' ');
+        clasificacionEl.textContent = `Clasificación: ${cls || '--'}`;
+    }
+
+    if (alertasPanel && alertasList) {
+        alertasList.innerHTML = '';
+        const alertas = Array.isArray(datos.alertas) ? datos.alertas : [];
+        if (alertas.length === 0) {
+            alertasPanel.style.display = 'none';
+        } else {
+            alertas.forEach((a) => {
+                const li = document.createElement('li');
+                const sev = a.severidad ? ` (${String(a.severidad).toUpperCase()})` : '';
+                li.textContent = `${a.mensaje || a.codigo || 'Alerta'}${sev}`;
+                alertasList.appendChild(li);
+            });
+            alertasPanel.style.display = 'block';
+        }
+    }
+
+    if (obsPanel && obsList) {
+        obsList.innerHTML = '';
+        const observaciones = Array.isArray(datos.observaciones) ? datos.observaciones : [];
+        if (observaciones.length === 0) {
+            obsPanel.style.display = 'none';
+        } else {
+            observaciones.forEach((texto) => {
+                const li = document.createElement('li');
+                li.textContent = texto;
+                obsList.appendChild(li);
+            });
+            obsPanel.style.display = 'block';
+        }
+    }
 }
 
 async function cargarAnaliticaUsuario({ mostrarErrores = false, lanzarToastFatiga = false } = {}) {
@@ -371,17 +990,22 @@ async function cargarAnaliticaUsuario({ mostrarErrores = false, lanzarToastFatig
     }
 
     const tipo = (document.getElementById('tipo-salto')?.value || 'vertical').toLowerCase();
+    const metrica = getMetricaAnalitica();
     asignarTexto('analitica-estado', 'Actualizando analítica...');
 
     try {
-        const [respuestaFatiga, respuestaTendencia] = await Promise.all([
+        const [respuestaFatiga, respuestaTendencia, respuestaAlertasTendencia, respuestaAvanzada] = await Promise.all([
             fetch(`${getBackendBaseUrl()}/api/usuarios/${usuario.idUsuario}/fatiga?tipo=${encodeURIComponent(tipo)}`),
-            fetch(`${getBackendBaseUrl()}/api/usuarios/${usuario.idUsuario}/tendencia?tipo=${encodeURIComponent(tipo)}`)
+            fetch(`${getBackendBaseUrl()}/api/usuarios/${usuario.idUsuario}/tendencia?tipo=${encodeURIComponent(tipo)}&metrica=${encodeURIComponent(metrica)}`),
+            fetch(`${getBackendBaseUrl()}/api/usuarios/${usuario.idUsuario}/alertas_tendencia?tipo=${encodeURIComponent(tipo)}`),
+            fetch(`${getBackendBaseUrl()}/api/usuarios/${usuario.idUsuario}/analitica_avanzada?tipo=${encodeURIComponent(tipo)}&metrica=${encodeURIComponent(metrica)}`)
         ]);
 
-        const [fatiga, tendencia] = await Promise.all([
+        const [fatiga, tendencia, alertasTendenciaPayload, avanzada] = await Promise.all([
             respuestaFatiga.json(),
-            respuestaTendencia.json()
+            respuestaTendencia.json(),
+            respuestaAlertasTendencia.json(),
+            respuestaAvanzada.json()
         ]);
 
         if (!respuestaFatiga.ok) {
@@ -390,8 +1014,15 @@ async function cargarAnaliticaUsuario({ mostrarErrores = false, lanzarToastFatig
         if (!respuestaTendencia.ok) {
             throw new Error(tendencia.error || `Error tendencia: HTTP ${respuestaTendencia.status}`);
         }
+        if (!respuestaAlertasTendencia.ok) {
+            throw new Error(alertasTendenciaPayload.error || `Error alertas tendencia: HTTP ${respuestaAlertasTendencia.status}`);
+        }
+        if (!respuestaAvanzada.ok) {
+            throw new Error(avanzada.error || `Error analitica avanzada: HTTP ${respuestaAvanzada.status}`);
+        }
 
-        actualizarPanelAnalitica(tendencia, fatiga, tipo);
+        actualizarPanelAnalitica(tendencia, fatiga, alertasTendenciaPayload.alertas || [], tipo);
+        actualizarPanelAnaliticaAvanzada(avanzada);
 
         if (lanzarToastFatiga && Boolean(fatiga.fatiga_significativa)) {
             const claveAlerta = [
@@ -420,6 +1051,9 @@ function mostrarComparativa(alias, tipoSalto, medidas) {
     const gridTecnico = document.querySelector('.technical-data-grid');
     const distanciaTitulo = document.getElementById('distancia-resultado');
     const subtitulo = document.getElementById('tipo-resultado');
+    const clasificacion = document.getElementById('clasificacion-salto');
+    const alertasPanel = document.getElementById('alertas-salto-panel');
+    const observacionesPanel = document.getElementById('observaciones-panel');
 
     if (!resumen || !panelResultados || !gridTecnico || !distanciaTitulo || !subtitulo) {
         return;
@@ -431,6 +1065,16 @@ function mostrarComparativa(alias, tipoSalto, medidas) {
     subtitulo.textContent = 'Comparativa completada';
 
     resumen.textContent = '';
+
+    if (clasificacion) {
+        clasificacion.textContent = 'Clasificación: --';
+    }
+    if (alertasPanel) {
+        alertasPanel.style.display = 'none';
+    }
+    if (observacionesPanel) {
+        observacionesPanel.style.display = 'none';
+    }
 
     const p1 = document.createElement('p');
     const spanAlias = document.createElement('span');
@@ -564,6 +1208,7 @@ function calcularFaseSalto(landmarks) {
         despegueX = xPieActual;
         yPicoVuelo = yPieActual;
         angulosDespegueActual = calcularAngulosDespegueDesdeLandmarks(landmarks);
+        asimetriaDespegueActual = calcularAsimetriaDesdeLandmarks(landmarks);
     } else if (estadoSalto === 'aire') {
         if (yPieActual < yPicoVuelo) {
             yPicoVuelo = yPieActual;
@@ -586,7 +1231,7 @@ function calcularFaseSalto(landmarks) {
 }
 
 function iniciarGrabacionVideoSiAplica() {
-    if (getPreferenciaGuardarVideoTiempoReal() !== 'si') {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         return;
     }
 
@@ -627,7 +1272,7 @@ function iniciarGrabacionVideoSiAplica() {
         }
     };
 
-    mediaRecorder.start(200);
+    mediaRecorder.start();
 }
 
 function detenerGrabacionYObtenerBlob() {
@@ -637,6 +1282,13 @@ function detenerGrabacionYObtenerBlob() {
 
     return new Promise((resolve) => {
         stopRecorderResolver = resolve;
+        try {
+            if (typeof mediaRecorder.requestData === 'function') {
+                mediaRecorder.requestData();
+            }
+        } catch (_e) {
+            // Ignorar si el navegador no permite requestData en este estado.
+        }
         mediaRecorder.stop();
     });
 }
@@ -647,18 +1299,45 @@ async function guardarResultadoEnBackend(datosLocales, guardarVideo, videoBlob) 
         throw new Error('No hay usuario activo. Selecciona o crea un usuario.');
     }
 
-    if (guardarVideo) {
-        if (!videoBlob) {
-            throw new Error('No se pudo capturar el vídeo en tiempo real.');
+    async function guardarLocalEnSaltos() {
+        const respuestaLocal = await fetch(`${getBackendBaseUrl()}/api/saltos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id_usuario: usuario.idUsuario,
+                tipo_salto: modoSalto,
+                distancia_cm: Math.round(datosLocales.distancia),
+                tiempo_vuelo_s: Number(datosLocales.tiempo_vuelo_s),
+                confianza_ia: datosLocales.confianza,
+                metodo_origen: 'ia_vivo',
+                potencia_w: datosLocales.potencia_w,
+                asimetria_pct: datosLocales.asimetria_pct,
+                estabilidad_aterrizaje: datosLocales.estabilidad_aterrizaje,
+                angulo_rodilla_deg: datosLocales.angulo_rodilla_deg,
+                angulo_cadera_deg: datosLocales.angulo_cadera_deg
+            })
+        });
+
+        const payloadLocal = await respuestaLocal.json();
+        if (!respuestaLocal.ok) {
+            throw new Error(payloadLocal.error || `Error HTTP: ${respuestaLocal.status}`);
         }
 
+        return {
+            ...datosLocales,
+            id_salto: payloadLocal.id_salto,
+            datos_parciales: true
+        };
+    }
+
+    if (videoBlob) {
         const formData = new FormData();
         formData.append('video', videoBlob, 'salto_tiempo_real.webm');
         formData.append('tipo_salto', modoSalto);
         formData.append('altura_real_m', String(usuario.altura));
         formData.append('id_usuario', String(usuario.idUsuario));
         formData.append('metodo_origen', 'ia_vivo');
-        formData.append('guardar_video_bd', 'true');
+        formData.append('guardar_video_bd', guardarVideo ? 'true' : 'false');
 
         const respuesta = await fetch(`${getBackendBaseUrl()}/api/salto/calcular`, {
             method: 'POST',
@@ -670,35 +1349,43 @@ async function guardarResultadoEnBackend(datosLocales, guardarVideo, videoBlob) 
             throw new Error(payload.error || `Error HTTP: ${respuesta.status}`);
         }
 
+        const potenciaPayload = normalizarNumeroOpcional(payload.potencia_w);
+        const asimetriaPayload = normalizarNumeroOpcional(payload.asimetria_pct);
+        const estabilidadPayload = normalizarNumeroOpcional(payload.estabilidad_aterrizaje);
+        const potenciaLocal = normalizarNumeroOpcional(datosLocales.potencia_w);
+        const asimetriaLocal = normalizarNumeroOpcional(datosLocales.asimetria_pct);
+        const estabilidadLocal = normalizarNumeroOpcional(datosLocales.estabilidad_aterrizaje);
+
+        const distanciaBackend = Number(payload.distancia || 0);
+        if (distanciaBackend <= 0 && Number(datosLocales.distancia || 0) > 0) {
+            mostrarToast('El backend devolvió 0 cm; se aplica la distancia local calibrada.', 'warn', 3200);
+            const fallbackLocal = await guardarLocalEnSaltos();
+            return {
+                ...payload,
+                ...fallbackLocal,
+                potencia_w: potenciaPayload ?? potenciaLocal,
+                asimetria_pct: asimetriaPayload ?? asimetriaLocal,
+                estabilidad_aterrizaje: estabilidadPayload ?? estabilidadLocal,
+                angulo_rodilla_deg: normalizarNumeroOpcional(payload.angulo_rodilla_deg) ?? datosLocales.angulo_rodilla_deg ?? null,
+                angulo_cadera_deg: normalizarNumeroOpcional(payload.angulo_cadera_deg) ?? datosLocales.angulo_cadera_deg ?? null,
+            };
+        }
+
         return {
             ...payload,
+            potencia_w: potenciaPayload ?? potenciaLocal,
+            asimetria_pct: asimetriaPayload ?? asimetriaLocal,
+            estabilidad_aterrizaje: estabilidadPayload ?? estabilidadLocal,
             angulo_rodilla_deg: normalizarNumeroOpcional(payload.angulo_rodilla_deg) ?? datosLocales.angulo_rodilla_deg ?? null,
             angulo_cadera_deg: normalizarNumeroOpcional(payload.angulo_cadera_deg) ?? datosLocales.angulo_cadera_deg ?? null,
         };
     }
 
-    const respuesta = await fetch(`${getBackendBaseUrl()}/api/saltos`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            id_usuario: usuario.idUsuario,
-            tipo_salto: modoSalto,
-            distancia_cm: Math.round(datosLocales.distancia),
-            tiempo_vuelo_s: Number(datosLocales.tiempo_vuelo_s),
-            confianza_ia: datosLocales.confianza,
-            metodo_origen: 'ia_vivo'
-        })
-    });
-
-    const payload = await respuesta.json();
-    if (!respuesta.ok) {
-        throw new Error(payload.error || `Error HTTP: ${respuesta.status}`);
+    if (guardarVideo && !videoBlob) {
+        mostrarToast('No se pudo capturar el vídeo para guardar en BD; se guarda solo la medicion local.', 'warn', 3400);
     }
 
-    return {
-        ...datosLocales,
-        id_salto: payload.id_salto
-    };
+    return guardarLocalEnSaltos();
 }
 
 async function finalizarSaltoEnVivo(tiempoVuelo, startX, endX, ySuelo, yPico) {
@@ -737,16 +1424,22 @@ async function finalizarSaltoEnVivo(tiempoVuelo, startX, endX, ySuelo, yPico) {
         frame_despegue: 'Directo',
         frame_aterrizaje: 'Directo',
         angulo_rodilla_deg: normalizarNumeroOpcional(angulosDespegueActual.angulo_rodilla_deg),
-        angulo_cadera_deg: normalizarNumeroOpcional(angulosDespegueActual.angulo_cadera_deg)
+        angulo_cadera_deg: normalizarNumeroOpcional(angulosDespegueActual.angulo_cadera_deg),
+        potencia_w: calcularPotenciaLocal(textoTipo, distanciaFinalCm, tiempoVuelo),
+        asimetria_pct: normalizarNumeroOpcional(asimetriaDespegueActual),
+        estabilidad_aterrizaje: calcularEstabilidadLocal(asimetriaDespegueActual, 0.95)
     };
 
     const guardarVideo = getPreferenciaGuardarVideoTiempoReal() === 'si';
-    const videoBlob = guardarVideo ? await detenerGrabacionYObtenerBlob() : null;
+    const videoBlob = await detenerGrabacionYObtenerBlob();
 
     document.dispatchEvent(new Event('detenerDeteccion'));
     document.dispatchEvent(new Event('restaurarBotonCamara'));
 
     const respuestaPersistida = await guardarResultadoEnBackend(datosLocales, guardarVideo, videoBlob);
+    if (respuestaPersistida?.datos_parciales) {
+        mostrarToast('Analisis guardado con datos locales; algunas metricas avanzadas pueden no estar disponibles.', 'warn', 3200);
+    }
     procesarResultadoSegunModo(respuestaPersistida);
 
     finalizandoSalto = false;
@@ -811,6 +1504,7 @@ document.addEventListener('iniciarDeteccion', () => {
         angulo_rodilla_deg: null,
         angulo_cadera_deg: null
     };
+    asimetriaDespegueActual = null;
     finalizandoSalto = false;
 
     actualizarBadgeComparativa();
@@ -908,6 +1602,14 @@ function animarResultados(datos) {
         elAsimetria.style.color = '';
     }
 
+    const estabilidad = Number(datos.estabilidad_aterrizaje);
+    const elEstabilidad = document.getElementById('data-estabilidad');
+    if (elEstabilidad) {
+        elEstabilidad.textContent = Number.isFinite(estabilidad) ? `${estabilidad.toFixed(3)}` : '--';
+    }
+
+    renderInsightsSalto(datos);
+
     panelResultados.classList.add('show');
 }
 
@@ -940,8 +1642,15 @@ document.getElementById('btn-actualizar-analitica')?.addEventListener('click', (
     });
 });
 
+document.getElementById('metrica-analitica')?.addEventListener('change', () => {
+    cargarAnaliticaUsuario().catch(() => {
+        // Mantener experiencia principal aunque falle actualización de analítica.
+    });
+});
+
 actualizarBadgeComparativa();
 limpiarAnaliticaPanel();
+fijarTamanoGraficasAnalitica();
 cargarAnaliticaUsuario().catch(() => {
     // Si falla al iniciar, se mantiene el panel en estado neutral.
 });

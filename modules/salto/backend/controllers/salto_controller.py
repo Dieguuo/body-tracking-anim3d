@@ -51,7 +51,7 @@ class SaltoController:
             )
 
         if tipo_salto == "horizontal":
-            return self.calculo.calcular_horizontal(frames, info.fps, altura_real_m)
+            return self.calculo.calcular_horizontal(frames, info.fps, altura_real_m, peso_kg)
 
         return self.calculo.calcular_vertical(frames, info.fps, altura_real_m, peso_kg)
 

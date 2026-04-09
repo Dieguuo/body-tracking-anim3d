@@ -193,6 +193,14 @@ Objetivo: representar visualmente el análisis sin necesidad de un visor 3D. Má
 - [ ] Devolver vídeo procesado como descarga o stream
 - [ ] Dibujar trayectoria de talones / centro de masa
 
+### 8.4 Biblioteca de vídeos guardados
+
+- [x] Crear menú separado `videos.html` para no saturar la pantalla principal
+- [x] Filtrar vídeos por usuario y tipo de salto
+- [x] Separar vídeos individuales y comparativas (grupos de 4)
+- [x] Mostrar fecha de cada vídeo
+- [x] Reproducción con pausa y seek (HTML5 + controles ±10 s)
+
 ## Fase 9 — Alertas inteligentes e interpretación automática
 
 Prerequisito: Fases 6–7 completadas (métricas completas disponibles).
@@ -201,26 +209,26 @@ Objetivo: que los datos no solo se muestren, sino que **cuenten algo útil** al 
 
 ### 9.1 Alertas biomecánicas por salto
 
-- [ ] "Amortiguación insuficiente" si rango de flexión < 20° en recepción
-- [ ] "Extensión de cadera limitada" si ángulo de cadera < umbral en el despegue
-- [ ] "Desequilibrio en la recepción" si asimetría de recepción > 15%
-- [ ] "Recepción inestable" si tiempo de estabilización > umbral
-- [ ] Devolver array `alertas[]` con código, mensaje y severidad en JSON
-- [ ] Mostrar alertas en el panel de resultados con iconos y colores
+- [x] "Amortiguación insuficiente" (heurística inicial)
+- [x] "Extensión de cadera limitada" si ángulo de cadera < umbral en el despegue
+- [x] "Desequilibrio en la recepción" (proxy por asimetría disponible)
+- [x] "Recepción inestable" (heurística inicial)
+- [x] Devolver array `alertas[]` con código, mensaje y severidad en JSON
+- [x] Mostrar alertas en el panel de resultados con colores y texto de severidad
 
 ### 9.2 Alertas de tendencia entre sesiones
 
-- [ ] Alerta si asimetría empeora en las últimas 3 sesiones
-- [ ] Alerta si potencia cae de forma sostenida (pendiente negativa en últimas 5 sesiones)
-- [ ] Alerta si patrón de fatiga se repite (caída >10% en N sesiones consecutivas)
-- [ ] Integrar alertas de tendencia en el panel de analítica del frontend
+- [x] Alerta si asimetría empeora en las últimas 3 sesiones
+- [x] Alerta si potencia cae de forma sostenida (estimación sobre últimas 5 sesiones)
+- [x] Alerta si patrón de fatiga se repite (caída >10% en sesiones consecutivas)
+- [x] Integrar alertas de tendencia en el panel de analítica del frontend
 
 ### 9.3 Observaciones automáticas
 
-- [ ] Generar texto descriptivo por salto: "Se detecta menor extensión de cadera respecto a la media del usuario"
-- [ ] Comparar métricas del salto actual vs media histórica del usuario
-- [ ] Clasificar salto como: equilibrado / asimétrico / fatigado / técnicamente correcto
-- [ ] Mostrar observaciones junto al panel de resultados
+- [x] Generar texto descriptivo por salto con reglas heurísticas
+- [x] Comparar salto actual vs media histórica del usuario (distancia)
+- [x] Clasificar salto como: equilibrado / asimétrico / fatigado / técnicamente correcto
+- [x] Mostrar observaciones junto al panel de resultados
 
 ## Fase 10 — Estadísticas avanzadas y correlaciones
 
@@ -230,23 +238,23 @@ Objetivo: extraer patrones y relaciones entre variables que no son evidentes a s
 
 ### 10.1 Panel de evolución ampliado
 
-- [ ] Gráfica de evolución de potencia a lo largo del tiempo
-- [ ] Gráfica de evolución de asimetría a lo largo del tiempo
-- [ ] Comparativa visual entre sesiones (superponer métricas de dos sesiones)
-- [ ] Selector de métricas para la gráfica (distancia, potencia, asimetría, ángulos)
+- [x] Gráfica de evolución de potencia estimada a lo largo del tiempo
+- [x] Gráfica de evolución de asimetría a lo largo del tiempo
+- [x] Comparativa visual entre sesiones (superponer métricas de dos sesiones)
+- [x] Selector de métricas para la gráfica (distancia, potencia estimada)
 
 ### 10.2 Correlaciones y patrones
 
-- [ ] Correlación peso vs potencia vs distancia (scatter plot)
-- [ ] Correlación asimetría vs estabilidad de aterrizaje
-- [ ] Detección de estancamiento: meseta en la curva de rendimiento (varianza baja en últimas N sesiones)
-- [ ] Detección de mejora significativa (test estadístico simple sobre últimas sesiones vs anteriores)
+- [x] Correlación peso vs potencia vs distancia (scatter plot)
+- [x] Correlación asimetría vs estabilidad de aterrizaje
+- [x] Detección de estancamiento: meseta en la curva de rendimiento (varianza baja en últimas N sesiones)
+- [x] Detección de mejora significativa (test estadístico simple sobre últimas sesiones vs anteriores)
 
 ### 10.3 Rankings y comparativas
 
-- [ ] Ranking de mejores sesiones por distancia media
-- [ ] Comparativa entre tipos de salto (vertical vs horizontal) del mismo usuario
-- [ ] Predicción de rendimiento afinada (regresión con más variables: peso, potencia, tendencia)
+- [x] Ranking de mejores sesiones por distancia media
+- [x] Comparativa entre tipos de salto (vertical vs horizontal) del mismo usuario
+- [x] Predicción de rendimiento afinada (regresión con más variables: peso, potencia, tendencia)
 
 ---
 

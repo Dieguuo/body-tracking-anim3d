@@ -111,9 +111,10 @@ class VideoProcessor:
             return [], None
 
         fps = cap.get(cv2.CAP_PROP_FPS)
-        if fps <= 0:
-            cap.release()
-            return [], None
+        # Algunos contenedores (sobre todo WebM) llegan sin metadata fiable de FPS.
+        # En ese caso usamos un valor seguro para mantener timestamps monotónicos.
+        if fps is None or fps <= 0:
+            fps = 30.0
 
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         ancho = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))

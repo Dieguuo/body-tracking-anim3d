@@ -14,6 +14,7 @@ Endpoints:
 import logging
 import os
 import uuid
+from datetime import datetime
 
 from dotenv import load_dotenv
 load_dotenv()  # carga .env antes de importar config
@@ -28,6 +29,12 @@ from controllers.usuario_controller import usuarios_bp
 from controllers.salto_db_controller import saltos_bp
 from models.salto_model import SaltoModel
 from models.usuario_model import UsuarioModel
+from services.analitica_service import calcular_fatiga_intra_sesion
+from services.interpretacion_service import (
+    clasificar_salto,
+    generar_alertas_salto,
+    generar_observaciones,
+)
 import mysql.connector
 
 app = Flask(__name__)
@@ -131,6 +138,44 @@ def calcular_salto():
 
         resultado = controller.procesar_salto(ruta_video, tipo_salto, altura_real_m, peso_kg)
 
+        media_historica_cm = None
+        fatiga_significativa = False
+        if id_usuario_str:
+            try:
+                id_usuario_int = int(id_usuario_str)
+                historial_tipo = salto_model.obtener_por_usuario_y_tipo(id_usuario_int, resultado.tipo_salto)
+                if historial_tipo:
+                    dist = [float(s.get("distancia_cm", 0) or 0) for s in historial_tipo]
+                    media_historica_cm = (sum(dist) / len(dist)) if dist else None
+
+                # Simula la sesión con el salto actual para clasificar fatiga de forma inmediata.
+                historial_con_actual = list(historial_tipo)
+                historial_con_actual.append({
+                    "distancia_cm": float(resultado.distancia or 0),
+                    "fecha_salto": datetime.now(),
+                })
+                fatiga = calcular_fatiga_intra_sesion(historial_con_actual)
+                fatiga_significativa = bool(fatiga.get("fatiga_significativa"))
+            except (ValueError, TypeError, KeyError):
+                logging.warning("No se pudo calcular contexto histórico para interpretación del salto")
+
+        alertas = generar_alertas_salto(
+            angulo_rodilla_deg=resultado.angulo_rodilla_deg,
+            angulo_cadera_deg=resultado.angulo_cadera_deg,
+            asimetria_pct=resultado.asimetria_pct,
+            confianza=resultado.confianza,
+        )
+        observaciones = generar_observaciones(
+            distancia_cm=float(resultado.distancia or 0),
+            media_historica_cm=media_historica_cm,
+            angulo_cadera_deg=resultado.angulo_cadera_deg,
+        )
+        clasificacion = clasificar_salto(
+            alertas=alertas,
+            asimetria_pct=resultado.asimetria_pct,
+            fatiga_significativa=fatiga_significativa,
+        )
+
         respuesta = {
             "tipo_salto": resultado.tipo_salto,
             "distancia": resultado.distancia,
@@ -143,9 +188,13 @@ def calcular_salto():
             "angulo_cadera_deg": resultado.angulo_cadera_deg,
             "potencia_w": resultado.potencia_w,
             "asimetria_pct": resultado.asimetria_pct,
+            "estabilidad_aterrizaje": resultado.estabilidad_aterrizaje,
             "metodo": resultado.metodo,
             "dist_por_pixeles": resultado.dist_por_pixeles,
             "dist_por_cinematica": resultado.dist_por_cinematica,
+            "alertas": alertas,
+            "observaciones": observaciones,
+            "clasificacion": clasificacion,
         }
 
         # Guardar en BD si se proporcionó id_usuario
@@ -162,6 +211,11 @@ def calcular_salto():
                     tiempo_vuelo_s=resultado.tiempo_vuelo_s,
                     confianza_ia=resultado.confianza,
                     metodo_origen=metodo_origen,
+                    potencia_w=resultado.potencia_w,
+                    asimetria_pct=resultado.asimetria_pct,
+                    angulo_rodilla_deg=resultado.angulo_rodilla_deg,
+                    angulo_cadera_deg=resultado.angulo_cadera_deg,
+                    estabilidad_aterrizaje=resultado.estabilidad_aterrizaje,
                 )
                 respuesta["id_salto"] = id_salto
 
