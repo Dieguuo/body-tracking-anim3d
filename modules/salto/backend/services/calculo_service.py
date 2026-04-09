@@ -1,5 +1,5 @@
 """
-SERVICE — Cálculos matemáticos puros para salto vertical y horizontal.
+SERVICIO — Cálculos matemáticos puros para salto vertical y horizontal.
 
 No accede a vídeo ni a red. Solo recibe datos numéricos y devuelve resultados.
 """
@@ -9,6 +9,7 @@ import numpy as np
 
 from config import GRAVEDAD, UMBRAL_DERIVADA_Y
 from models.video_processor import FramePies
+from services.biomecanica_service import BiomecanicaService
 
 
 @dataclass
@@ -24,11 +25,24 @@ class ResultadoSalto:
     metodo: str | None = None   # "pixeles" | "cinematica" | "hibrido"
     dist_por_pixeles: float | None = None   # cm (solo vertical)
     dist_por_cinematica: float | None = None  # cm (solo vertical)
+    angulo_rodilla_deg: float | None = None
+    angulo_cadera_deg: float | None = None
+    potencia_w: float | None = None
+    asimetria_pct: float | None = None
+    # Fase 6 — Biomecánica del aterrizaje
+    estabilidad_aterrizaje: dict | None = None
+    amortiguacion: dict | None = None
+    asimetria_recepcion_pct: float | None = None
+    # Fase 7 — Análisis cinemático temporal
+    curvas_angulares: dict | None = None
+    fases_salto: list | None = None
+    velocidades_articulares: dict | None = None
+    resumen_gesto: dict | None = None
 
 
 class CalculoService:
     """
-    SERVICE — Implementa las fórmulas de cinemática para salto vertical
+    SERVICIO — Implementa las fórmulas de cinemática para salto vertical
     y de proyección geométrica para salto horizontal.
     """
 
@@ -37,6 +51,7 @@ class CalculoService:
         frames: list[FramePies],
         fps: float,
         altura_real_m: float,
+        peso_kg: float | None = None,
     ) -> ResultadoSalto:
         """
         Salto vertical — combina dos métodos:
@@ -56,6 +71,8 @@ class CalculoService:
                 distancia=0.0,
                 confianza=0.0,
             )
+
+        angulo_rodilla, angulo_cadera = self._calcular_angulos_despegue(frames, despegue)
 
         tiempo_vuelo = (aterrizaje - despegue) / fps
 
@@ -95,6 +112,14 @@ class CalculoService:
             distancia_final = altura_cin_cm
             metodo = "cinematica"
 
+        # ── Potencia de Sayers (solo si hay peso) ──
+        potencia_w = None
+        if peso_kg is not None and peso_kg > 0 and distancia_final > 0:
+            potencia_w = round(BiomecanicaService.potencia_sayers(distancia_final, peso_kg), 1)
+
+        # ── Asimetría bilateral ──
+        asimetria_pct = self._calcular_asimetria(frames, despegue)
+
         return ResultadoSalto(
             tipo_salto="vertical",
             distancia=round(distancia_final, 2),
@@ -105,6 +130,10 @@ class CalculoService:
             metodo=metodo,
             dist_por_pixeles=round(altura_px_cm, 2) if altura_px_cm is not None else None,
             dist_por_cinematica=round(altura_cin_cm, 2),
+            angulo_rodilla_deg=round(angulo_rodilla, 2) if angulo_rodilla is not None else None,
+            angulo_cadera_deg=round(angulo_cadera, 2) if angulo_cadera is not None else None,
+            potencia_w=potencia_w,
+            asimetria_pct=asimetria_pct,
         )
 
     def calcular_horizontal(
@@ -129,6 +158,8 @@ class CalculoService:
                 distancia=0.0,
                 confianza=0.0,
             )
+
+        angulo_rodilla, angulo_cadera = self._calcular_angulos_despegue(frames, despegue)
 
         # Factor de escala: usar la altura en píxeles del frame de despegue
         altura_px = frames[despegue].altura_persona_px
@@ -172,6 +203,8 @@ class CalculoService:
             frame_despegue=despegue,
             frame_aterrizaje=aterrizaje,
             tiempo_vuelo_s=round(tiempo_vuelo, 4),
+            angulo_rodilla_deg=round(angulo_rodilla, 2) if angulo_rodilla is not None else None,
+            angulo_cadera_deg=round(angulo_cadera, 2) if angulo_cadera is not None else None,
         )
 
     def _detectar_vuelo(self, frames: list[FramePies], tipo_salto: str) -> tuple[int | None, int | None, float]:
@@ -271,3 +304,92 @@ class CalculoService:
                 if 0 <= idx < len(frames) and frames[idx].altura_persona_px:
                     return frames[idx].altura_persona_px
         return None
+
+    @staticmethod
+    def _calcular_angulos_despegue(frames: list[FramePies], idx_despegue: int) -> tuple[float | None, float | None]:
+        """
+        Calcula angulos articulares en el frame de despegue:
+        - Rodilla: entre vectores cadera->rodilla y tobillo->rodilla.
+        - Cadera: entre vectores hombro->cadera y rodilla->cadera.
+        """
+        if idx_despegue < 0 or idx_despegue >= len(frames):
+            return None, None
+
+        def frame_valido(fr: FramePies) -> bool:
+            return all(v is not None for v in [
+                fr.hombro_x,
+                fr.hombro_y,
+                fr.cadera_x,
+                fr.cadera_y,
+                fr.rodilla_x,
+                fr.rodilla_y,
+                fr.tobillo_x,
+                fr.tobillo_y,
+            ])
+
+        f = None
+        if frame_valido(frames[idx_despegue]):
+            f = frames[idx_despegue]
+        else:
+            # Fallback robusto: usar el frame mas cercano al despegue con landmarks validos.
+            for offset in range(1, min(len(frames), 8)):
+                idx_prev = idx_despegue - offset
+                idx_next = idx_despegue + offset
+                if idx_prev >= 0 and frame_valido(frames[idx_prev]):
+                    f = frames[idx_prev]
+                    break
+                if idx_next < len(frames) and frame_valido(frames[idx_next]):
+                    f = frames[idx_next]
+                    break
+
+        if f is None:
+            return None, None
+
+        p_hombro = (float(f.hombro_x), float(f.hombro_y))
+        p_cadera = (float(f.cadera_x), float(f.cadera_y))
+        p_rodilla = (float(f.rodilla_x), float(f.rodilla_y))
+        p_tobillo = (float(f.tobillo_x), float(f.tobillo_y))
+
+        angulo_rodilla = BiomecanicaService.angulo_articulacion_deg(
+            p_origen_v1=p_cadera,
+            p_articulacion=p_rodilla,
+            p_origen_v2=p_tobillo,
+        )
+        angulo_cadera = BiomecanicaService.angulo_articulacion_deg(
+            p_origen_v1=p_hombro,
+            p_articulacion=p_cadera,
+            p_origen_v2=p_rodilla,
+        )
+        return angulo_rodilla, angulo_cadera
+
+    @staticmethod
+    def _calcular_asimetria(frames: list[FramePies], idx_despegue: int) -> float | None:
+        """
+        Compara el desplazamiento Y del talón izquierdo vs derecho durante el despegue.
+
+        ASI = (|izq − der| / max(izq, der)) × 100
+        """
+        if idx_despegue < 0 or idx_despegue >= len(frames):
+            return None
+
+        f = frames[idx_despegue]
+        if f.talon_izq_y is None or f.talon_der_y is None:
+            return None
+
+        # Desplazamiento de cada talón respecto a su posición en reposo
+        # (frame 0 como referencia, si disponible)
+        ref = frames[0] if frames else f
+        if ref.talon_izq_y is None or ref.talon_der_y is None:
+            # Sin referencia, usar valores absolutos del frame de despegue
+            izq = abs(f.talon_izq_y)
+            der = abs(f.talon_der_y)
+        else:
+            izq = abs(ref.talon_izq_y - f.talon_izq_y)
+            der = abs(ref.talon_der_y - f.talon_der_y)
+
+        maximo = max(izq, der)
+        if maximo == 0:
+            return 0.0
+
+        asi = (abs(izq - der) / maximo) * 100
+        return round(asi, 1)

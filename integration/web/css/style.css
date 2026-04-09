@@ -301,6 +301,7 @@ body {
     width: 100%;
     max-width: 500px;
     margin: 0 auto;
+    overflow-y: auto;
 }
 
 .user-panel {
@@ -312,6 +313,88 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+}
+
+.analitica-panel {
+    margin-top: 0.35rem;
+    width: 100%;
+    border: 1px solid rgba(203, 156, 255, 0.28);
+    background: rgba(111, 56, 183, 0.08);
+    border-radius: 14px;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.analitica-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+}
+
+.analitica-titulo {
+    font-size: 0.95rem;
+    color: #d7b9f3;
+}
+
+.analitica-refresh {
+    height: 34px !important;
+    width: auto !important;
+    min-width: 110px;
+    border-radius: 10px;
+    font-size: 0.83rem !important;
+}
+
+.fatiga-alerta {
+    border-radius: 10px;
+    border: 1px solid rgba(248, 118, 135, 0.55);
+    background: rgba(187, 62, 77, 0.2);
+    color: #ffc3cc;
+    font-size: 0.84rem;
+    line-height: 1.35;
+    padding: 0.6rem 0.65rem;
+}
+
+.analitica-metricas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
+}
+
+.metrica-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.5rem 0.55rem;
+}
+
+.metrica-label {
+    font-size: 0.73rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
+}
+
+.metrica-item strong {
+    font-size: 0.92rem;
+    color: #ffffff;
+}
+
+.analitica-grafica-wrap {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.18);
+    padding: 0.45rem;
+}
+
+.analitica-grafica-wrap canvas {
+    width: 100% !important;
 }
 
 .panel-title {
@@ -851,4 +934,102 @@ body {
     color: rgba(255, 255, 255, 0.4);
     font-size: 0.8rem;
     text-align: center;
+}
+
+/* ═══════════════════════════════════════════════
+   PANELES DE ANÁLISIS AVANZADO (Fases 6-8)
+   ═══════════════════════════════════════════════ */
+
+.results-content {
+    overflow-y: auto;
+}
+
+.analisis-panel {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.analisis-panel-titulo {
+    font-size: 0.95rem;
+    color: #cb9cff;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.75rem;
+}
+
+.alerta-biomecanica {
+    margin-top: 0.6rem;
+    border-radius: 10px;
+    border: 1px solid rgba(248, 118, 135, 0.55);
+    background: rgba(187, 62, 77, 0.2);
+    color: #ffc3cc;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    padding: 0.5rem 0.6rem;
+}
+
+/* Timeline del salto */
+.timeline-barra {
+    display: flex;
+    width: 100%;
+    height: 32px;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.timeline-segmento {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #000;
+    font-size: 0.65rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    min-width: 24px;
+}
+
+.timeline-segmento:hover {
+    filter: brightness(1.25);
+}
+
+.timeline-marcador {
+    position: absolute;
+    top: -2px;
+    font-size: 1rem;
+    transform: translateX(-50%);
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
+
+.timeline-detalle {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 0.4rem;
+    text-align: center;
+    min-height: 1.1em;
+}
+
+/* Gráficas de curvas articulares */
+.grafica-wrap {
+    width: 100%;
+    height: 200px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.18);
+    padding: 0.4rem;
+    margin-top: 0.6rem;
+}
+
+.grafica-wrap canvas {
+    width: 100% !important;
 }

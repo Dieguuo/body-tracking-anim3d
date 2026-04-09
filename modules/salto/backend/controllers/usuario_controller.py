@@ -1,5 +1,5 @@
 """
-CONTROLLER — Endpoints REST para la tabla `usuarios`.
+CONTROLADOR — Endpoints REST para la tabla `usuarios`.
 
 Rutas:
     GET    /api/usuarios                  → Lista todos los usuarios
@@ -10,6 +10,8 @@ Rutas:
     GET    /api/usuarios/<id>/saltos      → Saltos de un usuario
     GET    /api/usuarios/<id>/progreso    → Progreso (mínimo 4+4)
     GET    /api/usuarios/<id>/comparativa → Comparativa intra-usuario
+    GET    /api/usuarios/<id>/fatiga      → Fatiga intra-sesión
+    GET    /api/usuarios/<id>/tendencia   → Tendencia histórica
 """
 
 from flask import Blueprint, jsonify, request
@@ -18,11 +20,23 @@ from mysql.connector import IntegrityError
 from models.usuario_model import UsuarioModel
 from models.salto_model import SaltoModel
 from services.comparativa_service import calcular_progreso, calcular_comparativa
+from services.analitica_service import (
+    TIPOS_SALTO_VALIDOS,
+    calcular_fatiga_intra_sesion,
+    calcular_tendencia_historial,
+)
 
 usuarios_bp = Blueprint("usuarios", __name__)
 
 _usuario_model = UsuarioModel()
 _salto_model = SaltoModel()
+
+
+def _leer_tipo_salto(default: str = "vertical"):
+    tipo = (request.args.get("tipo") or default).strip().lower()
+    if tipo not in TIPOS_SALTO_VALIDOS:
+        return None, jsonify({"error": f"tipo debe ser: {', '.join(sorted(TIPOS_SALTO_VALIDOS))}"}), 400
+    return tipo, None, None
 
 
 def _serializar(row: dict) -> dict:
@@ -90,8 +104,18 @@ def crear():
     except (ValueError, TypeError):
         return jsonify({"error": "altura_m debe ser un número válido"}), 400
 
+    peso_kg = None
+    peso_str = data.get("peso_kg")
+    if peso_str is not None:
+        try:
+            peso_kg = float(peso_str)
+            if not (20 <= peso_kg <= 300):
+                return jsonify({"error": "peso_kg debe estar entre 20 y 300 kg"}), 400
+        except (ValueError, TypeError):
+            return jsonify({"error": "peso_kg debe ser un número válido"}), 400
+
     try:
-        nuevo_id = _usuario_model.crear(alias, nombre, altura)
+        nuevo_id = _usuario_model.crear(alias, nombre, altura, peso_kg)
     except IntegrityError:
         return jsonify({"error": f"El alias '{alias}' ya existe"}), 409
 
@@ -126,8 +150,18 @@ def actualizar(id_usuario):
     except (ValueError, TypeError):
         return jsonify({"error": "altura_m debe ser un número válido"}), 400
 
+    peso_kg = None
+    peso_str = data.get("peso_kg")
+    if peso_str is not None:
+        try:
+            peso_kg = float(peso_str)
+            if not (20 <= peso_kg <= 300):
+                return jsonify({"error": "peso_kg debe estar entre 20 y 300 kg"}), 400
+        except (ValueError, TypeError):
+            return jsonify({"error": "peso_kg debe ser un número válido"}), 400
+
     try:
-        ok = _usuario_model.actualizar(id_usuario, alias, nombre, altura)
+        ok = _usuario_model.actualizar(id_usuario, alias, nombre, altura, peso_kg)
     except IntegrityError:
         return jsonify({"error": f"El alias '{alias}' ya existe"}), 409
 
@@ -184,3 +218,45 @@ def comparativa(id_usuario):
         }), 403
 
     return jsonify(resultado)
+
+
+@usuarios_bp.route("/api/usuarios/<int:id_usuario>/fatiga", methods=["GET"])
+def fatiga(id_usuario):
+    usuario = _usuario_model.obtener_por_id(id_usuario)
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    tipo, error_response, status = _leer_tipo_salto(default="vertical")
+    if error_response:
+        return error_response, status
+
+    saltos = _salto_model.obtener_por_usuario_y_tipo(id_usuario, tipo)
+    resultado = calcular_fatiga_intra_sesion(saltos)
+
+    return jsonify({
+        "id_usuario": id_usuario,
+        "alias": usuario["alias"],
+        "tipo_salto": tipo,
+        **resultado,
+    })
+
+
+@usuarios_bp.route("/api/usuarios/<int:id_usuario>/tendencia", methods=["GET"])
+def tendencia(id_usuario):
+    usuario = _usuario_model.obtener_por_id(id_usuario)
+    if not usuario:
+        return jsonify({"error": "Usuario no encontrado"}), 404
+
+    tipo, error_response, status = _leer_tipo_salto(default="vertical")
+    if error_response:
+        return error_response, status
+
+    saltos = _salto_model.obtener_por_usuario_y_tipo(id_usuario, tipo)
+    resultado = calcular_tendencia_historial(saltos)
+
+    return jsonify({
+        "id_usuario": id_usuario,
+        "alias": usuario["alias"],
+        "tipo_salto": tipo,
+        **resultado,
+    })

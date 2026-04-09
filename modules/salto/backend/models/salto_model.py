@@ -1,5 +1,5 @@
 """
-MODEL — Acceso a datos de la tabla `saltos`.
+MODELO — Acceso a datos de la tabla `saltos`.
 """
 
 import logging

@@ -1,5 +1,5 @@
 """
-CONTROLLER — Endpoints REST para la tabla `saltos`.
+CONTROLADOR — Endpoints REST para la tabla `saltos`.
 
 Rutas:
     GET    /api/saltos        → Lista todos los saltos

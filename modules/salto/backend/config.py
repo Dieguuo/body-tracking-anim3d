@@ -4,16 +4,27 @@ import os
 
 FLASK_PORT: int = int(os.getenv("SALTO_PORT", "5001"))
 
-# Orígenes permitidos para CORS (separados por coma en la variable de entorno)
-CORS_ORIGINS: list[str] = os.getenv(
-    "CORS_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080"
-).split(",")
+# Orígenes permitidos para CORS.
+# Usa "*" para entorno local flexible; también admite lista separada por comas.
+_cors_origins_raw = os.getenv("CORS_ORIGINS", "*").strip()
+if _cors_origins_raw == "*":
+    CORS_ORIGINS = "*"
+else:
+    CORS_ORIGINS = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
 
 # Gravedad terrestre (m/s²)
 GRAVEDAD: float = 9.81
 
 # MediaPipe — landmarks de los pies (índices según el modelo Pose)
 # https://developers.google.com/mediapipe/solutions/vision/pose_landmarker
+LANDMARK_HOMBRO_IZQ: int = 11
+LANDMARK_HOMBRO_DER: int = 12
+LANDMARK_CADERA_IZQ: int = 23
+LANDMARK_CADERA_DER: int = 24
+LANDMARK_RODILLA_IZQ: int = 25
+LANDMARK_RODILLA_DER: int = 26
+LANDMARK_TOBILLO_IZQ: int = 27
+LANDMARK_TOBILLO_DER: int = 28
 LANDMARK_TALON_IZQ: int = 29
 LANDMARK_TALON_DER: int = 30
 LANDMARK_PUNTA_IZQ: int = 31

@@ -7,12 +7,15 @@
 const BACKEND_SALTO_PORT = 5001;
 const BACKEND_SENSOR_PORT = 5000;
 
+function getCurrentHost() {
+    const host = (window.location.hostname || '').trim();
+    return host || 'localhost';
+}
+
 function getBackendBaseUrl() {
-    const ipServidor = window.location.hostname;
-    return `http://${ipServidor}:${BACKEND_SALTO_PORT}`;
+    return `http://${getCurrentHost()}:${BACKEND_SALTO_PORT}`;
 }
 
 function getSensorBaseUrl() {
-    const ipServidor = window.location.hostname;
-    return `http://${ipServidor}:${BACKEND_SENSOR_PORT}`;
+    return `http://${getCurrentHost()}:${BACKEND_SENSOR_PORT}`;
 }

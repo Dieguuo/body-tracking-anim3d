@@ -19,7 +19,7 @@ Documentación detallada en [`docs/`](docs/).
 | Módulo | Estado | Descripción |
 |--------|--------|-------------|
 | **Módulo 1 — Sensor Arduino** | ✅ Completado | Mide distancia con HC-SR04, expone los datos via API REST |
-| **Módulo 2 — Salto con móvil** | ✅ Backend completado | Analiza vídeo con MediaPipe, calcula salto vertical/horizontal |
+| **Módulo 2 — Salto con móvil** | ✅ Backend completado | Analiza vídeo con MediaPipe, calcula salto vertical/horizontal, análisis biomecánico completo |
 | **Base de datos** | ✅ Completada | MySQL — CRUD usuarios/saltos, progreso y comparativa |
 | **Integración web** | ✅ Completada | Frontend web unificado (landing + salto + sensor) |
 
@@ -62,7 +62,7 @@ proyecto-medicion/
 │       │   ├── pose_landmarker_lite.task
 │       │   ├── controllers/     ← salto_controller + usuario_controller + salto_db_controller
 │       │   ├── models/          ← video_processor + db + usuario_model + salto_model
-│       │   └── services/        ← calculo_service + comparativa_service
+│       │   └── services/        ← calculo + biomecanica + aterrizaje + cinematico + video_anotado + analitica + comparativa
 │       └── mobile/              # Reservado — cliente móvil
 │
 ├── integration/
@@ -158,4 +158,5 @@ frontend/app.js       (Frontend)    — fetch cada 1 s → actualiza DOM
 | [docs/arquitectura.md](docs/arquitectura.md) | Diagrama de capas y tecnologías |
 | [docs/flujo_datos.md](docs/flujo_datos.md) | Paso a paso del dato desde el dispositivo al navegador |
 | [docs/fases_proyecto.md](docs/fases_proyecto.md) | Estado de cada fase del proyecto |
-| [docs/decisiones_tecnicas.md](docs/decisiones_tecnicas.md) | Justificaciones de diseño (hilos, locks, parseo, MVC, BD, reglas de negocio) |
+| [docs/decisiones_tecnicas.md](docs/decisiones_tecnicas.md) | Justificaciones de diseño (hilos, locks, parseo, MVC, BD, biomecánica) |
+| [docs/manual_usuario.md](docs/manual_usuario.md) | Guía de uso paso a paso para el usuario final |

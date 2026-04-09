@@ -23,6 +23,10 @@ let framesCalibracion = 0;
 let escalaMetrosPorUnidad = 0;
 let yPicoVuelo = 1.0;
 let despegueX = 0;
+let angulosDespegueActual = {
+    angulo_rodilla_deg: null,
+    angulo_cadera_deg: null
+};
 
 let mediaRecorder = null;
 let chunksGrabacion = [];
@@ -31,6 +35,8 @@ let toastTimer = null;
 
 const SALTOS_OBJETIVO_COMPARATIVA = 4;
 let medidasComparativa = [];
+let graficaTendencia = null;
+let ultimaAlertaFatigaClave = '';
 
 // getBackendBaseUrl() se carga desde js/config.js
 
@@ -127,10 +133,285 @@ function normalizarTextoTipo(tipo) {
     return tipo;
 }
 
+function normalizarNumeroOpcional(valor) {
+    if (valor === null || valor === undefined || valor === '') {
+        return null;
+    }
+    const n = Number(valor);
+    return Number.isFinite(n) ? n : null;
+}
+
+function anguloEntreVectoresDeg(v1, v2) {
+    const dot = (v1.x * v2.x) + (v1.y * v2.y);
+    const cross = (v1.x * v2.y) - (v1.y * v2.x);
+    const mod1 = Math.hypot(v1.x, v1.y);
+    const mod2 = Math.hypot(v2.x, v2.y);
+    if (mod1 === 0 || mod2 === 0) {
+        return null;
+    }
+    return Math.abs(Math.atan2(Math.abs(cross), dot) * (180 / Math.PI));
+}
+
+function promedioPunto(landmarks, idxA, idxB) {
+    const a = landmarks?.[idxA];
+    const b = landmarks?.[idxB];
+    if (!a || !b) {
+        return null;
+    }
+    const ax = normalizarNumeroOpcional(a.x);
+    const ay = normalizarNumeroOpcional(a.y);
+    const bx = normalizarNumeroOpcional(b.x);
+    const by = normalizarNumeroOpcional(b.y);
+    if (ax === null || ay === null || bx === null || by === null) {
+        return null;
+    }
+    return {
+        x: (ax + bx) / 2,
+        y: (ay + by) / 2
+    };
+}
+
+function calcularAngulosDespegueDesdeLandmarks(landmarks) {
+    const hombro = promedioPunto(landmarks, 11, 12);
+    const cadera = promedioPunto(landmarks, 23, 24);
+    const rodilla = promedioPunto(landmarks, 25, 26);
+    const tobillo = promedioPunto(landmarks, 27, 28);
+
+    if (!hombro || !cadera || !rodilla || !tobillo) {
+        return {
+            angulo_rodilla_deg: null,
+            angulo_cadera_deg: null
+        };
+    }
+
+    const vCaderaRodilla = { x: rodilla.x - cadera.x, y: rodilla.y - cadera.y };
+    const vTobilloRodilla = { x: rodilla.x - tobillo.x, y: rodilla.y - tobillo.y };
+    const vHombroCadera = { x: cadera.x - hombro.x, y: cadera.y - hombro.y };
+    const vRodillaCadera = { x: cadera.x - rodilla.x, y: cadera.y - rodilla.y };
+
+    return {
+        angulo_rodilla_deg: anguloEntreVectoresDeg(vCaderaRodilla, vTobilloRodilla),
+        angulo_cadera_deg: anguloEntreVectoresDeg(vHombroCadera, vRodillaCadera)
+    };
+}
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function asignarTexto(id, texto) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.textContent = texto;
+    }
+}
+
+function limpiarAnaliticaPanel(mensaje = 'Selecciona un usuario para ver su tendencia.') {
+    asignarTexto('analitica-estado', mensaje);
+    asignarTexto('metrica-pendiente-historial', '-- cm/sem');
+    asignarTexto('metrica-r2', '--');
+    asignarTexto('metrica-prediccion', '-- cm');
+    asignarTexto('metrica-estado', '--');
+    asignarTexto('metrica-pendiente-sesion', '-- cm/salto');
+    asignarTexto('metrica-caida', '--%');
+
+    const alerta = document.getElementById('fatiga-alerta');
+    if (alerta) {
+        alerta.style.display = 'none';
+        alerta.textContent = '';
+    }
+
+    const canvas = document.getElementById('grafica-tendencia');
+    if (graficaTendencia) {
+        graficaTendencia.destroy();
+        graficaTendencia = null;
+    }
+    if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+}
+
+function capitalizarEstado(estado) {
+    if (!estado) {
+        return '--';
+    }
+    return `${estado.charAt(0).toUpperCase()}${estado.slice(1)}`;
+}
+
+function renderGraficaTendencia(historial, tipo) {
+    const canvas = document.getElementById('grafica-tendencia');
+    if (!canvas || !window.Chart || !Array.isArray(historial)) {
+        return;
+    }
+
+    const labels = historial.map((punto, idx) => {
+        const fecha = new Date(punto.fecha);
+        if (Number.isNaN(fecha.getTime())) {
+            return `Salto ${idx + 1}`;
+        }
+        return fecha.toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit'
+        });
+    });
+
+    const valoresReales = historial.map((p) => Number(p.distancia_cm || 0));
+    const valoresTendencia = historial.map((p) => Number(p.tendencia_cm || 0));
+
+    if (graficaTendencia) {
+        graficaTendencia.destroy();
+        graficaTendencia = null;
+    }
+
+    graficaTendencia = new window.Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: `Saltos ${normalizarTextoTipo(tipo)}`,
+                    data: valoresReales,
+                    borderColor: '#59ffc7',
+                    backgroundColor: 'rgba(89, 255, 199, 0.16)',
+                    pointRadius: 3,
+                    tension: 0.28,
+                    fill: true
+                },
+                {
+                    label: 'Línea de tendencia',
+                    data: valoresTendencia,
+                    borderColor: '#cb9cff',
+                    borderDash: [7, 5],
+                    pointRadius: 0,
+                    tension: 0,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#ffffff',
+                        boxWidth: 10,
+                        boxHeight: 10
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#c9b8da' },
+                    grid: { color: 'rgba(255,255,255,0.08)' }
+                },
+                y: {
+                    ticks: { color: '#c9b8da' },
+                    grid: { color: 'rgba(255,255,255,0.08)' },
+                    title: {
+                        display: true,
+                        text: 'Distancia (cm)',
+                        color: '#c9b8da'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function actualizarPanelAnalitica(tendencia, fatiga, tipo) {
+    const pendienteHistorial = Number(tendencia.pendiente_cm_semana || tendencia.pendiente || 0);
+    const r2 = Number(tendencia.r2 || 0);
+    const prediccion = Number(tendencia.prediccion_4_semanas || 0);
+    const pendienteSesion = Number(fatiga.pendiente || 0);
+    const caidaPct = Number(fatiga.caida_porcentual || 0);
+
+    asignarTexto('metrica-pendiente-historial', `${pendienteHistorial.toFixed(2)} cm/sem`);
+    asignarTexto('metrica-r2', r2.toFixed(3));
+    asignarTexto('metrica-prediccion', `${prediccion.toFixed(2)} cm`);
+    asignarTexto('metrica-estado', capitalizarEstado(tendencia.estado));
+    asignarTexto('metrica-pendiente-sesion', `${pendienteSesion.toFixed(2)} cm/salto`);
+    asignarTexto('metrica-caida', `${caidaPct.toFixed(2)}% (${Number(fatiga.numero_saltos || 0)} saltos)`);
+
+    const info = [
+        `${Number(tendencia.numero_saltos || 0)} saltos en historial`,
+        `modo ${normalizarTextoTipo(tipo)}`
+    ];
+    if (fatiga.sesion && fatiga.sesion.inicio && fatiga.sesion.fin) {
+        const ini = new Date(fatiga.sesion.inicio);
+        const fin = new Date(fatiga.sesion.fin);
+        if (!Number.isNaN(ini.getTime()) && !Number.isNaN(fin.getTime())) {
+            info.push(`sesión ${ini.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} - ${fin.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`);
+        }
+    }
+    asignarTexto('analitica-estado', info.join(' | '));
+
+    const alerta = document.getElementById('fatiga-alerta');
+    if (alerta) {
+        if (Boolean(fatiga.fatiga_significativa)) {
+            alerta.style.display = 'block';
+            alerta.textContent = `Alerta de fatiga: caída de ${caidaPct.toFixed(1)}% en la sesión actual con pendiente negativa.`;
+        } else {
+            alerta.style.display = 'none';
+            alerta.textContent = '';
+        }
+    }
+
+    renderGraficaTendencia(tendencia.historial || [], tipo);
+}
+
+async function cargarAnaliticaUsuario({ mostrarErrores = false, lanzarToastFatiga = false } = {}) {
+    const usuario = getUsuarioActivo();
+    if (!usuario) {
+        limpiarAnaliticaPanel();
+        return;
+    }
+
+    const tipo = (document.getElementById('tipo-salto')?.value || 'vertical').toLowerCase();
+    asignarTexto('analitica-estado', 'Actualizando analítica...');
+
+    try {
+        const [respuestaFatiga, respuestaTendencia] = await Promise.all([
+            fetch(`${getBackendBaseUrl()}/api/usuarios/${usuario.idUsuario}/fatiga?tipo=${encodeURIComponent(tipo)}`),
+            fetch(`${getBackendBaseUrl()}/api/usuarios/${usuario.idUsuario}/tendencia?tipo=${encodeURIComponent(tipo)}`)
+        ]);
+
+        const [fatiga, tendencia] = await Promise.all([
+            respuestaFatiga.json(),
+            respuestaTendencia.json()
+        ]);
+
+        if (!respuestaFatiga.ok) {
+            throw new Error(fatiga.error || `Error fatiga: HTTP ${respuestaFatiga.status}`);
+        }
+        if (!respuestaTendencia.ok) {
+            throw new Error(tendencia.error || `Error tendencia: HTTP ${respuestaTendencia.status}`);
+        }
+
+        actualizarPanelAnalitica(tendencia, fatiga, tipo);
+
+        if (lanzarToastFatiga && Boolean(fatiga.fatiga_significativa)) {
+            const claveAlerta = [
+                usuario.idUsuario,
+                tipo,
+                fatiga.sesion?.fin || '',
+                Number(fatiga.caida_porcentual || 0).toFixed(2)
+            ].join('|');
+
+            if (claveAlerta !== ultimaAlertaFatigaClave) {
+                mostrarToast(`Alerta de fatiga detectada: caída del ${Number(fatiga.caida_porcentual || 0).toFixed(1)}%`, 'warn', 3500);
+                ultimaAlertaFatigaClave = claveAlerta;
+            }
+        }
+    } catch (error) {
+        asignarTexto('analitica-estado', `No se pudo cargar la analítica: ${error.message}`);
+        if (mostrarErrores) {
+            mostrarToast(`No se pudo cargar la analítica: ${error.message}`, 'error', 3200);
+        }
+    }
 }
 
 function mostrarComparativa(alias, tipoSalto, medidas) {
@@ -282,6 +563,7 @@ function calcularFaseSalto(landmarks) {
         tiempoDespegue = performance.now();
         despegueX = xPieActual;
         yPicoVuelo = yPieActual;
+        angulosDespegueActual = calcularAngulosDespegueDesdeLandmarks(landmarks);
     } else if (estadoSalto === 'aire') {
         if (yPieActual < yPicoVuelo) {
             yPicoVuelo = yPieActual;
@@ -388,7 +670,11 @@ async function guardarResultadoEnBackend(datosLocales, guardarVideo, videoBlob) 
             throw new Error(payload.error || `Error HTTP: ${respuesta.status}`);
         }
 
-        return payload;
+        return {
+            ...payload,
+            angulo_rodilla_deg: normalizarNumeroOpcional(payload.angulo_rodilla_deg) ?? datosLocales.angulo_rodilla_deg ?? null,
+            angulo_cadera_deg: normalizarNumeroOpcional(payload.angulo_cadera_deg) ?? datosLocales.angulo_cadera_deg ?? null,
+        };
     }
 
     const respuesta = await fetch(`${getBackendBaseUrl()}/api/saltos`, {
@@ -449,7 +735,9 @@ async function finalizarSaltoEnVivo(tiempoVuelo, startX, endX, ySuelo, yPico) {
         confianza: 0.95,
         tiempo_vuelo_s: Number(tiempoVuelo.toFixed(3)),
         frame_despegue: 'Directo',
-        frame_aterrizaje: 'Directo'
+        frame_aterrizaje: 'Directo',
+        angulo_rodilla_deg: normalizarNumeroOpcional(angulosDespegueActual.angulo_rodilla_deg),
+        angulo_cadera_deg: normalizarNumeroOpcional(angulosDespegueActual.angulo_cadera_deg)
     };
 
     const guardarVideo = getPreferenciaGuardarVideoTiempoReal() === 'si';
@@ -468,6 +756,9 @@ function procesarResultadoSegunModo(datos) {
     const modo = getModoAnalisis();
     if (modo !== 'comparativa') {
         animarResultados(datos);
+        cargarAnaliticaUsuario({ lanzarToastFatiga: true }).catch(() => {
+            // La UI principal ya mostró el resultado del salto.
+        });
         return;
     }
 
@@ -480,6 +771,9 @@ function procesarResultadoSegunModo(datos) {
             'success',
             2200
         );
+        cargarAnaliticaUsuario({ lanzarToastFatiga: true }).catch(() => {
+            // No interrumpir modo comparativa si falla la analítica.
+        });
         return;
     }
 
@@ -487,6 +781,9 @@ function procesarResultadoSegunModo(datos) {
     const tipo = (datos.tipo_salto || document.getElementById('tipo-salto')?.value || 'vertical').toString().toLowerCase();
     mostrarComparativa(alias, tipo, medidasComparativa);
     resetComparativa();
+    cargarAnaliticaUsuario({ lanzarToastFatiga: true }).catch(() => {
+        // No interrumpir modo comparativa si falla la analítica.
+    });
 }
 
 document.addEventListener('iniciarDeteccion', () => {
@@ -510,6 +807,10 @@ document.addEventListener('iniciarDeteccion', () => {
     framesCalibracion = 0;
     alturaBaseY = 0;
     yPicoVuelo = 1.0;
+    angulosDespegueActual = {
+        angulo_rodilla_deg: null,
+        angulo_cadera_deg: null
+    };
     finalizandoSalto = false;
 
     actualizarBadgeComparativa();
@@ -531,6 +832,7 @@ document.addEventListener('detenerDeteccion', () => {
 
 document.addEventListener('videoListo', async (evento) => {
     const videoArchivo = evento.detail;
+    ultimoArchivoSubido = videoArchivo;  // Guardar referencia para vídeo anotado
     const tipoSalto = document.getElementById('tipo-salto').value;
     const alturaUsuario = document.getElementById('altura-usuario').value;
     const idUsuario = sessionStorage.getItem('idUser');
@@ -585,16 +887,391 @@ function animarResultados(datos) {
     document.getElementById('tipo-resultado').textContent = `Salto ${normalizarTextoTipo(datos.tipo_salto)}`;
 
     const porcentaje = Math.round((datos.confianza || 0) * 100);
+    const anguloRodilla = Number(datos.angulo_rodilla_deg);
+    const anguloCadera = Number(datos.angulo_cadera_deg);
     document.getElementById('data-confianza').textContent = `${porcentaje}%`;
     document.getElementById('data-tiempo').textContent = datos.tiempo_vuelo_s ? `${datos.tiempo_vuelo_s}s` : '--';
     document.getElementById('data-despegue').textContent = datos.frame_despegue || '--';
     document.getElementById('data-aterrizaje').textContent = datos.frame_aterrizaje || '--';
+    document.getElementById('data-angulo-rodilla').textContent = Number.isFinite(anguloRodilla) ? `${anguloRodilla.toFixed(2)} deg` : '--';
+    document.getElementById('data-angulo-cadera').textContent = Number.isFinite(anguloCadera) ? `${anguloCadera.toFixed(2)} deg` : '--';
+
+    const potencia = Number(datos.potencia_w);
+    document.getElementById('data-potencia').textContent = Number.isFinite(potencia) ? `${potencia} W` : '--';
+
+    const asimetria = Number(datos.asimetria_pct);
+    const elAsimetria = document.getElementById('data-asimetria');
+    if (Number.isFinite(asimetria)) {
+        elAsimetria.textContent = `${asimetria}%`;
+        elAsimetria.style.color = asimetria > 15 ? '#ff6b6b' : '';
+    } else {
+        elAsimetria.textContent = '--';
+        elAsimetria.style.color = '';
+    }
+
+    // Fase 6 — Panel de aterrizaje
+    renderPanelAterrizaje(datos);
+
+    // Fase 7 — Resumen del gesto
+    renderResumenGesto(datos);
+
+    // Fase 8.1 — Timeline
+    renderTimeline(datos);
+
+    // Fase 8.2 — Gráficas
+    renderGraficasCurvas(datos);
+
+    // Fase 8.3 — Botón vídeo anotado (solo si vino de archivo, no de tiempo real)
+    configurarBotonVideoAnotado(datos);
 
     panelResultados.classList.add('show');
 }
 
+// ── Fase 6 — Panel de aterrizaje ──
+
+function renderPanelAterrizaje(datos) {
+    const panel = document.getElementById('panel-aterrizaje');
+    if (!panel) {
+        return;
+    }
+
+    const estab = datos.estabilidad_aterrizaje;
+    const amort = datos.amortiguacion;
+    const asimRecep = normalizarNumeroOpcional(datos.asimetria_recepcion_pct);
+
+    if (!estab && !amort && asimRecep === null) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    panel.style.display = 'block';
+
+    if (estab) {
+        asignarTexto('data-oscilacion', `${estab.oscilacion_px} px`);
+        asignarTexto('data-t-estabilizacion', `${estab.tiempo_estabilizacion_s} s`);
+        asignarTexto('data-estable', estab.estable ? 'Sí' : 'No');
+    }
+
+    if (amort) {
+        asignarTexto('data-rod-aterrizaje', `${amort.angulo_rodilla_aterrizaje_deg} deg`);
+        asignarTexto('data-flex-maxima', `${amort.flexion_maxima_deg} deg`);
+        asignarTexto('data-amortiguacion', `${amort.rango_amortiguacion_deg} deg`);
+
+        const alertaRigidez = document.getElementById('alerta-rigidez');
+        if (alertaRigidez) {
+            alertaRigidez.style.display = amort.alerta_rigidez ? 'block' : 'none';
+        }
+    }
+
+    const elAsimRecep = document.getElementById('data-asim-recepcion');
+    const alertaAsim = document.getElementById('alerta-asim-recep');
+    if (asimRecep !== null) {
+        elAsimRecep.textContent = `${asimRecep}%`;
+        elAsimRecep.style.color = asimRecep > 15 ? '#ff6b6b' : '';
+        if (alertaAsim) {
+            if (asimRecep > 15) {
+                alertaAsim.textContent = `Alerta: asimetría de recepción ${asimRecep}% > 15% — riesgo de lesión.`;
+                alertaAsim.style.display = 'block';
+            } else {
+                alertaAsim.style.display = 'none';
+            }
+        }
+    } else {
+        elAsimRecep.textContent = '--';
+        elAsimRecep.style.color = '';
+        if (alertaAsim) {
+            alertaAsim.style.display = 'none';
+        }
+    }
+}
+
+// ── Fase 7 — Resumen del gesto ──
+
+function renderResumenGesto(datos) {
+    const panel = document.getElementById('panel-resumen-gesto');
+    if (!panel) {
+        return;
+    }
+
+    const resumen = datos.resumen_gesto;
+    const vels = datos.velocidades_articulares;
+
+    if (!resumen) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    panel.style.display = 'block';
+
+    asignarTexto('data-rom-rodilla', `${resumen.rom_rodilla_deg} deg`);
+    asignarTexto('data-rom-cadera', `${resumen.rom_cadera_deg} deg`);
+    asignarTexto('data-ratio-ec', resumen.ratio_excentrico_concentrico != null
+        ? String(resumen.ratio_excentrico_concentrico) : '--');
+
+    if (vels && vels.pico_vel_rodilla) {
+        asignarTexto('data-pico-vel-rod', `${vels.pico_vel_rodilla.valor_deg_s} °/s`);
+    } else {
+        asignarTexto('data-pico-vel-rod', '-- °/s');
+    }
+}
+
+// ── Fase 8.1 — Timeline interactivo ──
+
+const COLORES_FASE = {
+    preparatoria: '#7c4dff',
+    impulsion: '#00e5ff',
+    vuelo: '#69f0ae',
+    recepcion: '#ff9100'
+};
+
+function renderTimeline(datos) {
+    const panel = document.getElementById('panel-timeline');
+    const barra = document.getElementById('timeline-barra');
+    const detalle = document.getElementById('timeline-detalle');
+    if (!panel || !barra) {
+        return;
+    }
+
+    const fases = datos.fases_salto;
+    if (!Array.isArray(fases) || fases.length === 0) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    panel.style.display = 'block';
+    barra.textContent = '';
+
+    const frameMin = fases[0].frame_inicio;
+    const frameMax = fases[fases.length - 1].frame_fin;
+    const total = frameMax - frameMin || 1;
+
+    fases.forEach((f) => {
+        const dur = f.frame_fin - f.frame_inicio;
+        const pct = (dur / total) * 100;
+        const seg = document.createElement('div');
+        seg.className = 'timeline-segmento';
+        seg.style.width = `${pct}%`;
+        seg.style.backgroundColor = COLORES_FASE[f.fase] || '#888';
+        seg.title = `${f.fase} (frames ${f.frame_inicio}–${f.frame_fin})`;
+        seg.textContent = f.fase.charAt(0).toUpperCase() + f.fase.slice(1, 4);
+
+        seg.addEventListener('click', () => {
+            if (detalle) {
+                detalle.textContent = `${f.fase.charAt(0).toUpperCase() + f.fase.slice(1)}: frames ${f.frame_inicio}–${f.frame_fin} (${dur} frames)`;
+            }
+        });
+
+        barra.appendChild(seg);
+    });
+
+    // Marcadores de eventos sobre la barra
+    const eventos = [
+        { frame: datos.frame_despegue, label: '▲', color: COLOR_DESPEGUE_HEX },
+        { frame: datos.frame_aterrizaje, label: '▼', color: COLOR_ATERRIZAJE_HEX },
+    ];
+
+    eventos.forEach((ev) => {
+        if (ev.frame == null) {
+            return;
+        }
+        const pos = ((ev.frame - frameMin) / total) * 100;
+        const marcador = document.createElement('span');
+        marcador.className = 'timeline-marcador';
+        marcador.style.left = `${pos}%`;
+        marcador.style.color = ev.color;
+        marcador.textContent = ev.label;
+        marcador.title = `Frame ${ev.frame}`;
+        barra.appendChild(marcador);
+    });
+}
+
+const COLOR_DESPEGUE_HEX = '#ffeb3b';
+const COLOR_ATERRIZAJE_HEX = '#ff5722';
+
+// ── Fase 8.2 — Gráficas de curvas articulares ──
+
+let graficaRodilla = null;
+let graficaCadera = null;
+
+function renderGraficasCurvas(datos) {
+    const panel = document.getElementById('panel-graficas');
+    if (!panel || !window.Chart) {
+        return;
+    }
+
+    const curvas = datos.curvas_angulares;
+    const fases = datos.fases_salto;
+    if (!curvas || !Array.isArray(curvas.rodilla_deg)) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    panel.style.display = 'block';
+
+    const labels = curvas.indices.map((idx) => String(idx));
+    const faseBg = crearFondoFases(curvas.indices, fases);
+
+    graficaRodilla = renderCurvaArticular(
+        'grafica-rodilla', graficaRodilla, labels,
+        curvas.rodilla_deg, 'Ángulo Rodilla (°)', '#59ffc7', faseBg
+    );
+
+    graficaCadera = renderCurvaArticular(
+        'grafica-cadera', graficaCadera, labels,
+        curvas.cadera_deg, 'Ángulo Cadera (°)', '#cb9cff', faseBg
+    );
+}
+
+function renderCurvaArticular(canvasId, instanciaPrevia, labels, datos, titulo, color, faseBg) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        return null;
+    }
+
+    if (instanciaPrevia) {
+        instanciaPrevia.destroy();
+    }
+
+    return new window.Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: titulo,
+                    data: datos,
+                    borderColor: color,
+                    backgroundColor: `${color}33`,
+                    pointRadius: 1,
+                    tension: 0.3,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { labels: { color: '#fff', boxWidth: 10 } },
+                annotation: faseBg ? { annotations: faseBg } : undefined
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#c9b8da', maxTicksLimit: 15 },
+                    grid: { color: 'rgba(255,255,255,0.06)' },
+                    title: { display: true, text: 'Frame', color: '#c9b8da' }
+                },
+                y: {
+                    ticks: { color: '#c9b8da' },
+                    grid: { color: 'rgba(255,255,255,0.06)' },
+                    title: { display: true, text: 'Ángulo (°)', color: '#c9b8da' }
+                }
+            }
+        }
+    });
+}
+
+function crearFondoFases(indices, fases) {
+    if (!Array.isArray(fases) || !Array.isArray(indices) || indices.length === 0) {
+        return null;
+    }
+
+    // Sin el plugin chartjs-plugin-annotation, usamos un approach simple:
+    // Devolvemos null y los colores se ven en el timeline.
+    return null;
+}
+
+// ── Fase 8.3 — Vídeo anotado ──
+
+let ultimoArchivoSubido = null;
+
+function configurarBotonVideoAnotado(datos) {
+    const panel = document.getElementById('panel-video-anotado');
+    const btn = document.getElementById('btn-video-anotado');
+    if (!panel || !btn) {
+        return;
+    }
+
+    // Solo mostrar si el salto tiene datos válidos y vino de archivo
+    if (!datos.frame_despegue || !ultimoArchivoSubido) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    panel.style.display = 'block';
+    const estado = document.getElementById('video-anotado-estado');
+
+    btn.onclick = async () => {
+        btn.disabled = true;
+        if (estado) {
+            estado.textContent = 'Generando vídeo anotado...';
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('video', ultimoArchivoSubido, 'video_para_anotar.webm');
+            formData.append('tipo_salto', datos.tipo_salto || 'vertical');
+            formData.append('altura_real_m', String(
+                document.getElementById('altura-usuario')?.value || sessionStorage.getItem('alturaUser') || '1.70'
+            ));
+
+            const idUsuario = sessionStorage.getItem('idUser');
+            if (idUsuario) {
+                formData.append('id_usuario', idUsuario);
+            }
+
+            const respuesta = await fetch(`${getBackendBaseUrl()}/api/salto/video-anotado`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!respuesta.ok) {
+                const err = await respuesta.json().catch(() => ({ error: 'Error desconocido' }));
+                throw new Error(err.error || `HTTP ${respuesta.status}`);
+            }
+
+            const blob = await respuesta.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'salto_anotado.mp4';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            if (estado) {
+                estado.textContent = 'Descarga completada.';
+            }
+        } catch (error) {
+            if (estado) {
+                estado.textContent = `Error: ${error.message}`;
+            }
+        } finally {
+            btn.disabled = false;
+        }
+    };
+}
+
 document.getElementById('btn-reintentar').addEventListener('click', () => {
     document.getElementById('panel-resultados').classList.remove('show');
+    ultimoArchivoSubido = null;
+
+    // Limpiar paneles de análisis avanzado
+    ['panel-aterrizaje', 'panel-resumen-gesto', 'panel-timeline', 'panel-graficas', 'panel-video-anotado'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.display = 'none';
+        }
+    });
+    if (graficaRodilla) {
+        graficaRodilla.destroy();
+        graficaRodilla = null;
+    }
+    if (graficaCadera) {
+        graficaCadera.destroy();
+        graficaCadera = null;
+    }
 });
 
 document.getElementById('modo-analisis')?.addEventListener('change', () => {
@@ -605,6 +1282,25 @@ document.getElementById('tipo-salto')?.addEventListener('change', () => {
     if (getModoAnalisis() === 'comparativa') {
         resetComparativa();
     }
+    cargarAnaliticaUsuario().catch(() => {
+        // El usuario puede seguir usando la app aunque falle la analítica.
+    });
+});
+
+document.addEventListener('usuarioSeleccionCambio', () => {
+    cargarAnaliticaUsuario().catch(() => {
+        // El flujo de usuario activo sigue funcionando aunque falle la analítica.
+    });
+});
+
+document.getElementById('btn-actualizar-analitica')?.addEventListener('click', () => {
+    cargarAnaliticaUsuario({ mostrarErrores: true }).catch(() => {
+        // El error ya se notifica con toast.
+    });
 });
 
 actualizarBadgeComparativa();
+limpiarAnaliticaPanel();
+cargarAnaliticaUsuario().catch(() => {
+    // Si falla al iniciar, se mantiene el panel en estado neutral.
+});
