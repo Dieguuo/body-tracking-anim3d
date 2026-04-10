@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medición de Salto</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=20260409b">
 </head>
 <body class="salto-page">
     <div id="toast-aviso" class="toast-aviso" aria-live="polite"></div>
@@ -72,6 +72,7 @@
                             <th>Alias</th>
                             <th>Nombre</th>
                             <th>Altura</th>
+                            <th>Peso</th>
                         </tr>
                     </thead>
                     <tbody id="tabla-usuarios-body"></tbody>
@@ -90,13 +91,109 @@
 
             <div class="form-inline-usuario">
                 <input type="text" id="nuevo-alias" class="modern-input" placeholder="Alias" maxlength="50">
-                <input type="text" id="nuevo-nombre" class="modern-input" placeholder="Nombre completo" maxlength="100">
+                <input type="text" id="nuevo-nombre" class="modern-input" placeholder="Nombre completo" maxlength="120">
                 <input type="number" id="nuevo-altura" class="modern-input" placeholder="Altura (1.75)" step="0.01" min="0.5" max="2.5">
+                <input type="number" id="nuevo-peso" class="modern-input" placeholder="Peso kg (opcional)" step="0.1" min="20" max="300">
                 <button id="btn-crear-usuario-inline" class="sensor-btn secondary-btn" type="button">Crear usuario</button>
                 <button id="btn-cancelar-edicion" class="sensor-btn ghost-btn" type="button" style="display:none;">Cancelar edición</button>
             </div>
 
             <div id="usuario-estado" class="sensor-nota">Sin usuario activo.</div>
+            <a href="videos.html" class="sensor-btn secondary-btn biblioteca-link">Abrir biblioteca de vídeos</a>
+
+            <div class="analitica-panel">
+                <div class="analitica-header">
+                    <h3 class="analitica-titulo">Evolución y fatiga</h3>
+                    <div class="analitica-tools">
+                        <select id="metrica-analitica" class="modern-input analitica-select">
+                            <option value="distancia" selected>Distancia</option>
+                            <option value="potencia_estimada">Potencia estimada</option>
+                        </select>
+                        <button id="btn-actualizar-analitica" class="sensor-btn ghost-btn analitica-refresh" type="button">Actualizar</button>
+                    </div>
+                </div>
+
+                <p id="analitica-estado" class="sensor-nota">Selecciona un usuario para ver su tendencia.</p>
+
+                <div id="fatiga-alerta" class="fatiga-alerta" style="display:none;"></div>
+                <div id="alertas-tendencia" class="alertas-tendencia" style="display:none;"></div>
+
+                <div class="analitica-metricas">
+                    <div class="metrica-item">
+                        <span class="metrica-label">Pendiente historial</span>
+                        <strong id="metrica-pendiente-historial">-- cm/sem</strong>
+                    </div>
+                    <div class="metrica-item">
+                        <span class="metrica-label">R²</span>
+                        <strong id="metrica-r2">--</strong>
+                    </div>
+                    <div class="metrica-item">
+                        <span class="metrica-label">Predicción 4 semanas</span>
+                        <strong id="metrica-prediccion">-- cm</strong>
+                    </div>
+                    <div class="metrica-item">
+                        <span class="metrica-label">Estado</span>
+                        <strong id="metrica-estado">--</strong>
+                    </div>
+                    <div class="metrica-item">
+                        <span class="metrica-label">Pendiente sesión</span>
+                        <strong id="metrica-pendiente-sesion">-- cm/salto</strong>
+                    </div>
+                    <div class="metrica-item">
+                        <span class="metrica-label">Caída sesión</span>
+                        <strong id="metrica-caida">--%</strong>
+                    </div>
+                </div>
+
+                <div class="analitica-grafica-wrap" id="wrap-grafica-tendencia">
+                    <canvas id="grafica-tendencia"></canvas>
+                </div>
+
+                <div class="analitica-grafica-wrap analitica-grafica-wrap-advanced" id="wrap-grafica-asimetria">
+                    <p class="analitica-grafica-title">Evolución de asimetría</p>
+                    <canvas id="grafica-asimetria"></canvas>
+                    <p id="empty-grafica-asimetria" class="analitica-empty-text" style="display:none;">No hay datos de asimetría suficientes para graficar.</p>
+                </div>
+
+                <div class="analitica-grafica-wrap analitica-grafica-wrap-advanced" id="wrap-grafica-corr-peso-potencia">
+                    <p class="analitica-grafica-title">Correlación peso vs potencia</p>
+                    <canvas id="grafica-corr-peso-potencia"></canvas>
+                    <p id="empty-grafica-corr-peso-potencia" class="analitica-empty-text" style="display:none;">No hay muestras suficientes para esta correlación.</p>
+                </div>
+
+                <div class="analitica-grafica-wrap analitica-grafica-wrap-advanced" id="wrap-grafica-corr-asim-estabilidad">
+                    <p class="analitica-grafica-title">Correlación asimetría vs estabilidad</p>
+                    <canvas id="grafica-corr-asim-estabilidad"></canvas>
+                    <p id="empty-grafica-corr-asim-estabilidad" class="analitica-empty-text" style="display:none;">Aún no hay datos de asimetría/estabilidad suficientes.</p>
+                </div>
+
+                <div class="analitica-avanzada-grid">
+                    <div class="metrica-item metrica-item-wide">
+                        <span class="metrica-label">Comparativa sesiones</span>
+                        <strong id="sesiones-resumen">--</strong>
+                    </div>
+                    <div class="metrica-item metrica-item-wide">
+                        <span class="metrica-label">Correlaciones</span>
+                        <strong id="correlaciones-resumen">--</strong>
+                    </div>
+                    <div class="metrica-item metrica-item-wide">
+                        <span class="metrica-label">Estancamiento / mejora</span>
+                        <strong id="estancamiento-resumen">--</strong>
+                    </div>
+                    <div class="metrica-item metrica-item-wide">
+                        <span class="metrica-label">Comparativa vertical vs horizontal</span>
+                        <strong id="comparativa-tipos-resumen">--</strong>
+                    </div>
+                    <div class="metrica-item metrica-item-wide">
+                        <span class="metrica-label">Predicción multivariable</span>
+                        <strong id="prediccion-multi-resumen">--</strong>
+                    </div>
+                    <div class="metrica-item metrica-item-wide">
+                        <span class="metrica-label">Ranking sesiones</span>
+                        <strong id="ranking-resumen">--</strong>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -124,15 +221,144 @@
                     <span class="data-label">F. Aterrizaje</span>
                     <span id="data-aterrizaje" class="data-value">--</span>
                 </div>
+                <div class="data-box">
+                    <span class="data-label">Ang. Rodilla</span>
+                    <span id="data-angulo-rodilla" class="data-value">-- deg</span>
+                </div>
+                <div class="data-box">
+                    <span class="data-label">Ang. Cadera</span>
+                    <span id="data-angulo-cadera" class="data-value">-- deg</span>
+                </div>
+                <div class="data-box">
+                    <span class="data-label">Potencia</span>
+                    <span id="data-potencia" class="data-value">-- W</span>
+                </div>
+                <div class="data-box">
+                    <span class="data-label">Asimetría</span>
+                    <span id="data-asimetria" class="data-value">-- %</span>
+                </div>
+                <div class="data-box">
+                    <span class="data-label">Estabilidad</span>
+                    <span id="data-estabilidad" class="data-value">--</span>
+                </div>
+            </div>
+
+            <div id="clasificacion-salto" class="clasificacion-salto">Clasificación: --</div>
+
+            <div id="alertas-salto-panel" class="insights-panel" style="display:none;">
+                <h3 class="insights-title">Alertas biomecánicas</h3>
+                <ul id="lista-alertas-salto" class="insights-list"></ul>
+            </div>
+
+            <div id="observaciones-panel" class="insights-panel" style="display:none;">
+                <h3 class="insights-title">Observaciones automáticas</h3>
+                <ul id="lista-observaciones" class="insights-list"></ul>
+            </div>
+
+            <!-- Fase 6 — Aterrizaje -->
+            <div id="panel-aterrizaje" class="analisis-panel" style="display: none;">
+                <h3 class="analisis-panel-titulo">Biomecánica del aterrizaje</h3>
+                <div class="technical-data-grid">
+                    <div class="data-box">
+                        <span class="data-label">Oscilación CM</span>
+                        <span id="data-oscilacion" class="data-value">-- px</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">T. Estabilización</span>
+                        <span id="data-t-estabilizacion" class="data-value">-- s</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Estable</span>
+                        <span id="data-estable" class="data-value">--</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Ang. Rodilla Aterr.</span>
+                        <span id="data-rod-aterrizaje" class="data-value">-- deg</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Flex. Máxima</span>
+                        <span id="data-flex-maxima" class="data-value">-- deg</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Amortiguación</span>
+                        <span id="data-amortiguacion" class="data-value">-- deg</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Asim. Recepción</span>
+                        <span id="data-asim-recepcion" class="data-value">-- %</span>
+                    </div>
+                </div>
+                <div id="alerta-rigidez" class="alerta-biomecanica" style="display:none;">
+                    Alerta: amortiguación &lt; 20° — recepción rígida, riesgo de lesión.
+                </div>
+                <div id="alerta-asim-recep" class="alerta-biomecanica" style="display:none;"></div>
+            </div>
+
+            <!-- Fase 7 — Resumen del gesto -->
+            <div id="panel-resumen-gesto" class="analisis-panel" style="display: none;">
+                <h3 class="analisis-panel-titulo">Resumen del gesto</h3>
+                <div class="technical-data-grid">
+                    <div class="data-box">
+                        <span class="data-label">ROM Rodilla</span>
+                        <span id="data-rom-rodilla" class="data-value">-- deg</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">ROM Cadera</span>
+                        <span id="data-rom-cadera" class="data-value">-- deg</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Ratio Exc/Con</span>
+                        <span id="data-ratio-ec" class="data-value">--</span>
+                    </div>
+                    <div class="data-box">
+                        <span class="data-label">Pico Vel. Rodilla</span>
+                        <span id="data-pico-vel-rod" class="data-value">-- °/s</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fase 8.1 — Timeline del salto -->
+            <div id="panel-timeline" class="analisis-panel" style="display: none;">
+                <h3 class="analisis-panel-titulo">Timeline del salto</h3>
+                <div id="timeline-barra" class="timeline-barra"></div>
+                <p id="timeline-detalle" class="timeline-detalle"></p>
+            </div>
+
+            <!-- Fase 8.2 — Gráficas de curvas articulares -->
+            <div id="panel-graficas" class="analisis-panel" style="display: none;">
+                <h3 class="analisis-panel-titulo">Curvas articulares</h3>
+
+                <!-- Selector para comparar con otro intento -->
+                <div id="comparar-salto-wrap" class="comparar-salto-wrap" style="display: none;">
+                    <label for="select-salto-comparar" class="comparar-label">Superponer con:</label>
+                    <select id="select-salto-comparar" class="modern-input comparar-select">
+                        <option value="">— ninguno —</option>
+                    </select>
+                    <button id="btn-quitar-comparacion" class="sensor-btn secondary-btn comparar-btn-quitar" style="display:none;">✕</button>
+                </div>
+
+                <div class="grafica-wrap">
+                    <canvas id="grafica-rodilla" height="200"></canvas>
+                </div>
+                <div class="grafica-wrap">
+                    <canvas id="grafica-cadera" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Fase 8.3 — Descarga de vídeo anotado -->
+            <div id="panel-video-anotado" class="analisis-panel" style="display: none;">
+                <button id="btn-video-anotado" class="sensor-btn secondary-btn">Descargar vídeo anotado</button>
+                <span id="video-anotado-estado" class="sensor-nota"></span>
             </div>
 
             <button id="btn-reintentar" class="primary-btn-large">Nuevo Salto</button>
         </div>
     </div>
 
-    <script src="js/config.js"></script>
-    <script src="js/camara.js"></script>
-    <script src="js/registro.js"></script>
-    <script type="module" src="js/api_salto.js"></script>
+    <script src="js/config.js?v=20260409b"></script>
+    <script src="js/camara.js?v=20260409b"></script>
+    <script src="js/registro.js?v=20260409b"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script type="module" src="js/api_salto.js?v=20260409b"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 """
-MODEL — Procesador de vídeo con MediaPipe PoseLandmarker (Tasks API).
+MODELO — Procesador de vídeo con MediaPipe PoseLandmarker (Tasks API).
 
 Lee un vídeo fotograma a fotograma, detecta los landmarks anatómicos
 y devuelve las coordenadas de los pies en cada frame.
@@ -18,6 +18,14 @@ from mediapipe.tasks.python.vision import (
 )
 
 from config import (
+    LANDMARK_HOMBRO_IZQ,
+    LANDMARK_HOMBRO_DER,
+    LANDMARK_CADERA_IZQ,
+    LANDMARK_CADERA_DER,
+    LANDMARK_RODILLA_IZQ,
+    LANDMARK_RODILLA_DER,
+    LANDMARK_TOBILLO_IZQ,
+    LANDMARK_TOBILLO_DER,
     LANDMARK_TALON_IZQ,
     LANDMARK_TALON_DER,
     LANDMARK_PUNTA_IZQ,
@@ -48,6 +56,15 @@ class FramePies:
     punta_der_x: float | None
     # Altura completa de la persona en píxeles (para calibración)
     altura_persona_px: float | None
+    # Puntos articulares promedio (izq/der) para biomecánica de despegue
+    hombro_x: float | None
+    hombro_y: float | None
+    cadera_x: float | None
+    cadera_y: float | None
+    rodilla_x: float | None
+    rodilla_y: float | None
+    tobillo_x: float | None
+    tobillo_y: float | None
 
 
 @dataclass
@@ -61,7 +78,7 @@ class InfoVideo:
 
 class VideoProcessor:
     """
-    MODEL — Procesa un archivo de vídeo y extrae las coordenadas de los pies
+    MODELO — Procesa un archivo de vídeo y extrae las coordenadas de los pies
     fotograma a fotograma mediante MediaPipe PoseLandmarker.
 
     Se crea un nuevo PoseLandmarker por cada llamada a procesar() para
@@ -94,9 +111,10 @@ class VideoProcessor:
             return [], None
 
         fps = cap.get(cv2.CAP_PROP_FPS)
-        if fps <= 0:
-            cap.release()
-            return [], None
+        # Algunos contenedores (sobre todo WebM) llegan sin metadata fiable de FPS.
+        # En ese caso usamos un valor seguro para mantener timestamps monotónicos.
+        if fps is None or fps <= 0:
+            fps = 30.0
 
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         ancho = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -135,6 +153,10 @@ class VideoProcessor:
                 talon_izq_y=None, talon_der_y=None, punta_izq_y=None, punta_der_y=None,
                 talon_izq_x=None, talon_der_x=None, punta_izq_x=None, punta_der_x=None,
                 altura_persona_px=None,
+                hombro_x=None, hombro_y=None,
+                cadera_x=None, cadera_y=None,
+                rodilla_x=None, rodilla_y=None,
+                tobillo_x=None, tobillo_y=None,
             )
 
         # Buscar la silueta más grande (la persona real frente a la cámara)
@@ -158,6 +180,10 @@ class VideoProcessor:
                 talon_izq_y=None, talon_der_y=None, punta_izq_y=None, punta_der_y=None,
                 talon_izq_x=None, talon_der_x=None, punta_izq_x=None, punta_der_x=None,
                 altura_persona_px=None,
+                hombro_x=None, hombro_y=None,
+                cadera_x=None, cadera_y=None,
+                rodilla_x=None, rodilla_y=None,
+                tobillo_x=None, tobillo_y=None,
             )
 
         lm = mejor_lm
@@ -168,6 +194,16 @@ class VideoProcessor:
 
         def px_x(i: int) -> float:
             return lm[i].x * ancho
+
+        def promedio_par(i_izq: int, i_der: int) -> tuple[float | None, float | None]:
+            x_izq, y_izq = px_x(i_izq), px_y(i_izq)
+            x_der, y_der = px_x(i_der), px_y(i_der)
+            return ((x_izq + x_der) / 2.0, (y_izq + y_der) / 2.0)
+
+        hombro_x, hombro_y = promedio_par(LANDMARK_HOMBRO_IZQ, LANDMARK_HOMBRO_DER)
+        cadera_x, cadera_y = promedio_par(LANDMARK_CADERA_IZQ, LANDMARK_CADERA_DER)
+        rodilla_x, rodilla_y = promedio_par(LANDMARK_RODILLA_IZQ, LANDMARK_RODILLA_DER)
+        tobillo_x, tobillo_y = promedio_par(LANDMARK_TOBILLO_IZQ, LANDMARK_TOBILLO_DER)
 
         return FramePies(
             frame_idx=idx,
@@ -181,6 +217,14 @@ class VideoProcessor:
             punta_izq_x=px_x(LANDMARK_PUNTA_IZQ),
             punta_der_x=px_x(LANDMARK_PUNTA_DER),
             altura_persona_px=altura_px if altura_px > 0 else None,
+            hombro_x=hombro_x,
+            hombro_y=hombro_y,
+            cadera_x=cadera_x,
+            cadera_y=cadera_y,
+            rodilla_x=rodilla_x,
+            rodilla_y=rodilla_y,
+            tobillo_x=tobillo_x,
+            tobillo_y=tobillo_y,
         )
 
 

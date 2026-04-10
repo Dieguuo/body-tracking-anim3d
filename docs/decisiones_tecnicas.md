@@ -177,7 +177,7 @@ claves foráneas, transacciones ACID y `ON DELETE CASCADE`. La librería
 `mysql-connector-python` es el conector oficial de Oracle, sin dependencias  
 externas en C.
 
-Se usa un **pool de 5 conexiones** (`MySQLConnectionPool`) con inicialización  
+Se usa un **pool de 10 conexiones** (`MySQLConnectionPool`) con inicialización  
 lazy (se crea al primer uso). Un context manager (`get_connection()`) obtiene  
 una conexión del pool, hace commit automático al salir o rollback si hay  
 excepción, y devuelve la conexión al pool. Esto evita abrir/cerrar conexiones  
@@ -290,3 +290,233 @@ El backend limita a 100 MB con `MAX_CONTENT_LENGTH`, pero sin validación
 cliente el usuario esperaría todo el upload para recibir un 413. Ahora
 `camara.js` comprueba `file.size` antes de enviar y muestra un aviso
 inmediato si se excede.
+
+---
+
+## Decisiones del módulo de biomecánica y análisis avanzado (Fase 5)
+
+## Potencia de Sayers en vez de fuerza directa
+
+No se dispone de plataforma de fuerza, así que no se puede medir la
+potencia real de despegue. La **ecuación de Sayers (1999)** es la fórmula
+más utilizada en valoración deportiva para estimar la potencia pico de
+miembros inferiores a partir de la altura del salto vertical y el peso
+corporal:
+
+    P (W) = 60.7 × altura_cm + 45.3 × peso_kg − 2055
+
+Es un estándar reconocido en ciencias del deporte (validado contra
+plataformas de fuerza con R² > 0.88). Solo requiere añadir `peso_kg`
+al perfil del usuario — dato que ya se pide en muchas apps de fitness.
+El campo es opcional (`DECIMAL(5,1) NULL`); si no está informado, la
+respuesta del salto devuelve `potencia_w: null`.
+
+## Asimetría bilateral por desplazamiento de talones
+
+Se compara el desplazamiento vertical del talón izquierdo frente al
+derecho en el frame de despegue, usando el frame 0 como referencia
+de reposo. El índice ASI (Asymmetry Symmetry Index) se calcula como:
+
+    ASI = (|izq − der| / max(izq, der)) × 100
+
+Un valor > 15 % se señala con alerta visual en el frontend como
+indicador de riesgo de lesión. Los datos de talón izquierdo/derecho
+ya están disponibles en `FramePies` (landmarks 29/30 de MediaPipe).
+
+## Ángulos articulares por trigonometría de landmarks
+
+MediaPipe ya devuelve landmarks de cadera (23/24), rodilla (25/26) y
+tobillo (27/28). El ángulo de una articulación se calcula como el ángulo
+entre los dos segmentos que la forman, usando `arctan2` sobre el producto
+vectorial y el producto escalar:
+
+    θ = arctan2(|a × b|, a · b)
+
+donde `a` = vector proximal→articulación y `b` = vector distal→articulación.
+
+Se extraen en el frame de despegue (ya detectado por `_detectar_vuelo`).
+No requiere modelo de IA adicional — es geometría pura sobre datos que
+ya se procesan.
+
+## Índice de asimetría bilateral (ASI)
+
+El ASI compara la contribución de cada pierna al salto:
+
+    ASI = (|izq − der| / max(izq, der)) × 100
+
+Un ASI > 15% es un indicador reconocido de riesgo de lesión en la
+literatura de biomecánica deportiva. Los datos ya están disponibles en
+`FramePies` (talon_izq_y / talon_der_y), solo falta compararlos en el
+frame de despegue.
+
+## Detección de fatiga por pendiente de regresión
+
+Si un jugador hace múltiples saltos en una sesión y los últimos producen
+distancias significativamente menores, hay fatiga neuromuscular. Se
+detecta calculando la pendiente de regresión lineal sobre las distancias
+ordenadas cronológicamente. Una caída > 10% respecto al primer salto
+de la sesión se considera significativa.
+
+La agrupación en "sesión" se hace por ventana temporal (saltos del mismo
+usuario en un rango de 2 horas), sin necesidad de que el usuario abra/
+cierre sesión explícitamente.
+
+## Curva de progresión con regresión temporal
+
+Para responder "¿estoy mejorando?", se calcula una regresión lineal de
+distancia sobre el tiempo (semanas) usando el historial completo del
+usuario, separado por tipo de salto. Se devuelven:
+
+- **Pendiente** (cm/semana): ritmo de mejora positivo o negativo
+- **R²**: fiabilidad de la tendencia (>0.5 = tendencia clara)
+- **Estado**: mejorando / estancado / empeorando (basado en pendiente + R²)
+
+Esto no requiere librerías adicionales — `numpy.polyfit(x, y, 1)` es
+suficiente para regresión lineal.
+
+---
+
+## Decisiones de la biomecánica del aterrizaje y análisis cinemático (Fases 6-8)
+
+## Centro de masa aproximado por promedio de caderas
+
+En un análisis clínico se usaría un modelo biomecánico completo (15+
+segmentos). Aquí se aproxima el centro de masa (CM) con el **promedio Y
+de las caderas** (landmarks 23 y 24 de MediaPipe). Es una simplificación
+aceptable para análisis 2D con cámara fija: la cadera está cerca del CM
+real del cuerpo y su oscilación post-aterrizaje refleja fielmente la
+estabilidad de la recepción.
+
+## Ventana post-aterrizaje fija de 30 frames
+
+En vídeos a 30 FPS, 30 frames equivalen a ~1 segundo. Es suficiente
+para capturar la fase de recepción completa (estabilización típica en
+0.3–0.8 s). Un valor mayor incluiría la siguiente preparación; uno menor
+podría cortar recepción es lentas. Si el vídeo termina antes, se usa lo
+disponible.
+
+## Umbral de estabilización en derivada de Y < 0.5 px/frame
+
+Se necesitan al menos 2 frames consecutivos con derivada menor que el
+umbral para considerar que el CM se ha estabilizado. Esto evita falsos
+positivos por un frame quieto aislado entre oscilaciones. El valor
+0.5 px/frame se determinó empíricamente en pruebas con vídeos de saltos
+reales.
+
+## Amortiguación medida como rango de flexión de rodilla
+
+En la literatura de biomecánica deportiva, la amortiguación en la
+recepción se evalúa por cuánto flexiona la rodilla después del contacto.
+Se calcula la diferencia entre el ángulo de rodilla al aterrizar y la
+flexión máxima alcanzada en los frames posteriores. El umbral de 20° lo
+establece `AterrizajeService` como alerta de rigidez: una recepción con
+menos de 20° de rango de flexión indica impacto casi directo en las
+articulaciones, factor de riesgo de lesión.
+
+## Simetría de recepción con la misma fórmula ASI
+
+Se reutiliza la fórmula ASI (ya implementada para el despegue en
+Fase 5.3) aplicándola al frame de aterrizaje. Esto mantiene coherencia
+en las métricas y no añade complejidad nueva. Los datos de ambos talones
+ya están disponibles en `FramePies`.
+
+## Curvas angulares con margen de ±15 frames
+
+El análisis cinemático cubre desde 15 frames antes del despegue hasta
+15 frames después del aterrizaje (`MARGEN_FRAMES = 15`). Incluir
+frames previos al despegue captura la fase preparatoria (contramovimiento);
+incluir frames post-aterrizaje captura la recepción completa. El suavizado
+con media móvil de 3 frames filtra el ruido inherente a la detección de
+landmarks por MediaPipe sin deformar la señal.
+
+## Detección de fases por mínimo de flexión de rodilla
+
+Las 4 fases del salto se segmentan automáticamente buscando el mínimo
+de flexión de rodilla antes del despegue (pico del contramovimiento):
+
+1. **Preparatoria**: desde el inicio del rango hasta el mínimo de flexión.
+2. **Impulsión**: desde el mínimo de flexión hasta el despegue.
+3. **Vuelo**: despegue → aterrizaje (ya detectados).
+4. **Recepción**: aterrizaje → estabilización (calculada por `AterrizajeService`).
+
+Esta segmentación no requiere clasificadores — es geometría sobre la
+curva de ángulo ya calculada.
+
+## Velocidades articulares por diferenciación finita
+
+La velocidad angular se calcula como `Δθ × fps` (°/s) entre frames
+consecutivos. No se necesitan sensores inerciales: la resolución temporal
+de MediaPipe a 30 FPS es suficiente para detectar picos de velocidad
+articular en movimientos explosivos como el salto.
+
+## Ratio excéntrico/concéntrico
+
+Se define como la duración de la fase preparatoria (excéntrica) dividida
+entre la duración de la fase de impulsión (concéntrica). Un ratio > 1
+indica que el sujeto tarda más en preparar que en impulsar (típico de
+principiantes). Un ratio cercano a 1 indica eficiencia neuromuscular.
+
+## Vídeo anotado con OpenCV en vez de frontend canvas
+
+Dibujar landmarks en tiempo real con canvas/WebGL requiere enviar las
+coordenadas al frontend y sincronizarlas con el vídeo. Anotar el vídeo
+en backend con OpenCV es más robusto: el usuario recibe un MP4 terminado
+que puede descargar, compartir y revisar offline. Se reutiliza MediaPipe
+PoseLandmarker en el vídeo original (segunda pasada) para obtener los
+landmarks frame a frame y dibujarlos con `cv2.line()` / `cv2.circle()`.
+
+## Selección de persona en vídeo anotado
+
+Al igual que en `VideoProcessor`, se detectan hasta 2 poses y se
+selecciona la silueta más grande (distancia cabeza-pies). Esto garantiza
+que los landmarks dibujados correspondan a la persona real y no al
+reflejo, coherente con el filtrado del procesamiento original.
+
+## Codec MP4V para el vídeo anotado
+
+Se usa el codec `mp4v` (MPEG-4 Part 2) con extensión `.mp4`. Es
+compatible con todos los navegadores y reproductores sin necesidad de
+codecs adicionales. El vídeo se elimina del disco tras enviarlo al
+cliente (`send_file` + limpieza en `finally`).
+
+---
+
+## Decisiones de robustez y UX para resultados no válidos
+
+## Guardia de interpretación para distancia 0
+
+Cuando `distancia <= 0` (no se detectó vuelo o desplazamiento válido),
+las funciones `generar_alertas_salto()`, `generar_observaciones()` y
+`clasificar_salto()` del servicio de interpretación podían devolver
+resultados engañosos (ej. "equilibrado" o "técnicamente correcto" con
+0 cm). Ahora `app.py` intercepta este caso antes de llamar a los
+servicios de interpretación: devuelve `clasificacion: "no_detectado"`,
+alertas vacías y una observación orientativa sobre requisitos del vídeo.
+
+En el frontend, `animarResultados()` detecta `distancia <= 0` y muestra
+"No detectado" en lugar de "0 cm", oculta los paneles técnicos
+(aterrizaje, gesto, timeline, curvas) y presenta un toast explicativo.
+Solo se mantiene visible el panel de observaciones/insights.
+
+## Auto-detección de tipo de salto (implementada pero no activada)
+
+Se implementó `detectar_tipo_salto()` en `CalculoService` que compara
+el desplazamiento Y vs X durante el vuelo para determinar si el
+movimiento es realmente vertical u horizontal, independientemente de
+lo que el usuario haya seleccionado. Heurística: si `delta_Y / delta_X > 5`,
+el salto es vertical.
+
+La función existe como utilidad pero **no se invoca automáticamente**
+en el flujo principal. Decisión: no cambiar silenciosamente el tipo
+que el usuario eligió. Si el vídeo muestra un salto vertical y el
+usuario pidió horizontal, el resultado será bajo pero correcto para
+lo que se midió. Es responsabilidad del usuario elegir el tipo adecuado.
+
+## Import json faltante en salto_model.py
+
+Los campos `curvas_angulares` y `estabilidad_aterrizaje` se serializan
+como JSON al guardar en BD y se deserializan al leer. El archivo usaba
+`json.dumps()` y `json.loads()` pero no importaba el módulo `json`,
+causando `NameError` en cualquier operación CRUD de saltos. Se añadió
+`import json` al encabezado del archivo.
+

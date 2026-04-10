@@ -23,9 +23,14 @@ Arduino (HC-SR04) → Serial USB (9600 baud) → Python MVC → Flask API → Fr
 ### Módulo salto (Fase 2 — backend activo)
 
 ```
-Móvil (vídeo grabado) → Upload POST → MediaPipe PoseLandmarker → Cálculo híbrido (cinemática + calibración) → Flask API → JSON
-                                                                                                         ↕
-                                                                                              MySQL (usuarios + saltos)
+Móvil (vídeo grabado) → Upload POST → MediaPipe PoseLandmarker → Cálculo híbrido (cinemática + calibración)
+                                                                           │
+                                                              AterrizajeService (estabilidad + amortiguación)
+                                                              CinematicoService (curvas + fases + velocidades)
+                                                                           │
+                                                                  Flask API → JSON / Vídeo anotado
+                                                                           ↕
+                                                                MySQL (usuarios + saltos)
 ```
 
 ## Capas
@@ -33,7 +38,7 @@ Móvil (vídeo grabado) → Upload POST → MediaPipe PoseLandmarker → Cálcul
 | Capa | Tecnología | Responsabilidad |
 |------|-----------|----------------|
 | Hardware | Arduino + HC-SR04 | Medir distancia física |
-| Visión artificial | MediaPipe + OpenCV | Analizar vídeo, detectar landmarks anatómicos de los pies |
+| Visión artificial | MediaPipe + OpenCV | Analizar vídeo, detectar landmarks anatómicos, generar vídeo anotado |
 | Backend | Python + Flask | Leer serial / procesar vídeo, exponer API REST |
 | Base de datos | MySQL (InnoDB) | Persistencia de usuarios y saltos (tablas `usuarios` y `saltos`) |
 | Frontend (integración) | HTML / JS / CSS | Dashboard web unificado (mobile-first) |
@@ -61,16 +66,21 @@ modules/salto/backend/
 ├── config.py                    ← Constantes (gravedad, landmarks, umbrales, DB_CONFIG)
 ├── pose_landmarker_lite.task    ← Modelo MediaPipe
 ├── controllers/
-│   ├── salto_controller.py      ← Orquesta procesamiento + cálculo
-│   ├── usuario_controller.py    ← CRUD usuarios + endpoints progreso/comparativa
+│   ├── salto_controller.py      ← Orquesta procesamiento + cálculo + análisis avanzado
+│   ├── usuario_controller.py    ← CRUD usuarios + endpoints progreso/comparativa/fatiga/tendencia
 │   └── salto_db_controller.py   ← CRUD saltos en BD
 ├── models/
 │   ├── db.py                    ← Pool de conexiones MySQL (context manager)
-│   ├── video_processor.py       ← MediaPipe PoseLandmarker — extrae pies por frame
+│   ├── video_processor.py       ← MediaPipe PoseLandmarker — extrae landmarks por frame
 │   ├── usuario_model.py         ← Queries tabla usuarios
 │   └── salto_model.py           ← Queries tabla saltos
 └── services/
     ├── calculo_service.py       ← Fórmulas cinemáticas puras
+    ├── biomecanica_service.py   ← Trigonometría pura para ángulos articulares
+    ├── aterrizaje_service.py    ← Biomecánica del aterrizaje (estabilidad, amortiguación, simetría)
+    ├── cinematico_service.py    ← Análisis cinemático temporal (curvas, fases, velocidades, resumen)
+    ├── video_anotado_service.py ← Generación de vídeo con overlay OpenCV
+    ├── analitica_service.py     ← Fatiga intra-sesión + tendencia histórica
     └── comparativa_service.py   ← Lógica de negocio: progreso (mín. 4+4) y comparativa
 ```
 
@@ -81,11 +91,14 @@ usuarios (1) ──────< (N) saltos
    id_usuario PK            id_salto PK
    alias UNIQUE             id_usuario FK → usuarios
    nombre_completo          tipo_salto ENUM('vertical','horizontal')
-   altura_m DECIMAL(3,2)    distancia_cm INT
-   fecha_registro           tiempo_vuelo_s DECIMAL(5,3)
-                            confianza_ia DECIMAL(3,2)
+   altura_m DECIMAL(4,2)    distancia_cm INT
+   peso_kg DECIMAL(5,1)     tiempo_vuelo_s DECIMAL(6,3)
+   fecha_registro           confianza_ia DECIMAL(4,3)
                             metodo_origen ENUM('ia_vivo','video_galeria','sensor_arduino')
                             fecha_salto
+                            video_blob LONGBLOB
+                            video_nombre VARCHAR(255)
+                            video_mime VARCHAR(100)
 ```
 
 Relación 1:N con `ON DELETE CASCADE`: al eliminar un usuario se eliminan todos sus saltos.

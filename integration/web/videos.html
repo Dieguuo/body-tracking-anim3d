@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biblioteca de vídeos</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="videos-page">
+    <header class="top-bar">
+        <a href="index.html" class="back-button"><span class="arrow">←</span> Volver</a>
+        <h1 class="header-title">Biblioteca de vídeos</h1>
+    </header>
+
+    <main class="videos-layout">
+        <section class="videos-filtros">
+            <label class="pre-camera-label" for="filtro-usuario">Usuario</label>
+            <select id="filtro-usuario" class="modern-input"></select>
+
+            <label class="pre-camera-label" for="filtro-tipo">Tipo de salto</label>
+            <select id="filtro-tipo" class="modern-input">
+                <option value="">Todos</option>
+                <option value="vertical">Vertical</option>
+                <option value="horizontal">Horizontal</option>
+            </select>
+
+            <button id="btn-refrescar-videos" class="sensor-btn secondary-btn" type="button">Actualizar vídeos</button>
+            <p id="videos-estado" class="sensor-nota">Cargando biblioteca...</p>
+        </section>
+
+        <section class="videos-seccion">
+            <h2 class="panel-title">Comparativas (grupos de 4)</h2>
+            <div id="comparativas-container" class="videos-grid"></div>
+            <p id="comparativas-empty" class="sensor-nota" style="display:none;">No hay vídeos de comparativa con los filtros actuales.</p>
+        </section>
+
+        <section class="videos-seccion">
+            <h2 class="panel-title">Vídeos individuales</h2>
+            <div id="individuales-container" class="videos-grid"></div>
+            <p id="individuales-empty" class="sensor-nota" style="display:none;">No hay vídeos individuales con los filtros actuales.</p>
+        </section>
+    </main>
+
+    <script src="js/config.js"></script>
+    <script src="js/videos.js"></script>
+</body>
+</html>
