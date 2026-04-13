@@ -1,6 +1,7 @@
 pyserial
 flask
 flask-cors
+flask-limiter
 mediapipe
 opencv-python
 numpy

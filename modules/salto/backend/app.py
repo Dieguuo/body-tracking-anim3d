@@ -21,6 +21,8 @@ load_dotenv()  # carga .env antes de importar config
 
 from flask import Flask, Response, jsonify, request, send_file
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.utils import secure_filename
 
 from config import FLASK_PORT, UPLOAD_FOLDER, EXTENSIONES_PERMITIDAS, MAX_UPLOAD_MB, CORS_ORIGINS
@@ -42,6 +44,19 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 CORS(app, origins=CORS_ORIGINS)
 
+# ── Rate Limiting ──────────────────────────────────────────────
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["120 per minute"],          # global por defecto
+    storage_uri="memory://",
+)
+
+
+@app.errorhandler(429)
+def ratelimit_exceeded(e):
+    return jsonify({"error": "Demasiadas solicitudes. Inténtalo de nuevo más tarde."}), 429
+
 
 @app.after_request
 def agregar_cabeceras_seguridad(response):
@@ -54,6 +69,10 @@ def agregar_cabeceras_seguridad(response):
 
 app.register_blueprint(usuarios_bp)
 app.register_blueprint(saltos_bp)
+
+# ── Límites específicos para endpoints de escritura en blueprints ──
+limiter.limit("20 per minute")(usuarios_bp)
+limiter.limit("20 per minute")(saltos_bp)
 
 controller = SaltoController()
 salto_model = SaltoModel()
@@ -72,6 +91,7 @@ def archivo_demasiado_grande(e):
 
 
 @app.route("/api/salto/calcular", methods=["POST"])
+@limiter.limit("10 per minute")
 def calcular_salto():
     """
     Recibe un vídeo y parámetros, devuelve el resultado del salto.
@@ -272,6 +292,7 @@ def calcular_salto():
 
 
 @app.route("/api/salto/video-anotado", methods=["POST"])
+@limiter.limit("5 per minute")
 def video_anotado():
     """
     Recibe un vídeo, lo procesa y devuelve un vídeo con overlay de

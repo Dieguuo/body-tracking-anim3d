@@ -53,7 +53,7 @@ Prerequisito: Fases 1 y 2 completadas.
 - [x] `run_all.bat` con pre-checks (venv, .env, imports)
 - [ ] Autenticación de usuarios (JWT o sesiones)
 - [ ] Protección CSRF para endpoints de escritura
-- [ ] Rate limiting en endpoints POST/DELETE
+- [x] Rate limiting en endpoints POST/DELETE
 
 ## Fase 5 — Biomecánica y análisis avanzado de saltos
 
