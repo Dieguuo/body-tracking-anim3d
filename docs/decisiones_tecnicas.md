@@ -520,3 +520,110 @@ como JSON al guardar en BD y se deserializan al leer. El archivo usaba
 causando `NameError` en cualquier operación CRUD de saltos. Se añadió
 `import json` al encabezado del archivo.
 
+---
+
+## Decisiones de HTTPS y acceso móvil
+
+## Certificado SSL autofirmado para cámara en móvil
+
+La API `getUserMedia()` (acceso a cámara) requiere un **Secure Context**
+(HTTPS o localhost). Desde un móvil en LAN, `http://192.168.x.x` no es
+seguro y el navegador bloquea la cámara.
+
+Se genera un certificado autofirmado con `scripts/generate_cert.py`
+(librería `cryptography`), almacenado en `certs/cert.pem` +
+`certs/key.pem`. Incluye SAN (Subject Alternative Name) para localhost,
+127.0.0.1 y la IP LAN detectada automáticamente. Válido 365 días.
+
+El directorio `certs/` está en `.gitignore` — cada desarrollador genera
+el suyo al clonar el proyecto.
+
+## Servidor HTTPS frontend (`scripts/https_server.py`)
+
+El `python -m http.server` estándar no soporta SSL. Se creó
+`scripts/https_server.py` que envuelve `http.server.SimpleHTTPRequestHandler`
+con `ssl.SSLContext`, sirviendo `integration/web/` en el puerto **8443**.
+
+## Detección automática de SSL en Flask
+
+`app.py` busca `certs/cert.pem` y `certs/key.pem` al arrancar. Si
+existen, Flask sirve por HTTPS automáticamente (`ssl_context=(cert, key)`);
+si no existen, arranca por HTTP como antes. Esto mantiene compatibilidad
+con entornos sin certificado.
+
+## Detección de protocolo en `config.js`
+
+`config.js` detecta si la página se cargó por HTTPS y usa el protocolo
+correspondiente para construir la URL del backend. También soporta
+override vía `localStorage.getItem('BACKEND_URL')` para acceso por
+túneles (devtunnels, ngrok).
+
+---
+
+## Decisiones de detección en tiempo real (frontend)
+
+## Modelo `pose_landmarker_full` en vez de `lite`
+
+La variante `lite` del modelo MediaPipe producía landmarks imprecisos
+con jitter visible en la visualización en tiempo real. Se cambió a
+`pose_landmarker_full`, que tiene mayor precisión de detección a costa
+de ~20 ms más de latencia — aceptable en dispositivos modernos.
+
+## Suavizado EMA (Exponential Moving Average) de landmarks
+
+Aun con el modelo `full`, los landmarks oscilan entre frames. Se aplica
+un filtro EMA con α=0.4 sobre cada coordenada:
+
+    suavizado[t] = α × raw[t] + (1 − α) × suavizado[t−1]
+
+El array de landmarks suavizados (`landmarksSuavizados`) se resetea al
+iniciar una nueva sesión de detección, evitando contaminación entre
+sesiones.
+
+## Umbrales de confianza a 0.6
+
+Los valores por defecto de `minPoseDetectionConfidence` y
+`minTrackingConfidence` (0.5) dejaban pasar detecciones ruidosas. Se
+subieron ambos a 0.6 para reducir falsos positivos sin perder detecciones
+legítimas.
+
+## Confianza desde visibilidad real de MediaPipe
+
+La confianza se calculaba hardcoded como 0.95. Ahora se promedia la
+propiedad `visibility` de los landmarks relevantes (cadera, rodilla,
+tobillo: índices 23-30) durante toda la sesión de detección.
+
+## Estabilidad post-aterrizaje desde desviación estándar
+
+La estabilidad se calculaba como derivada de la confianza (valor fijo →
+siempre estable). Ahora se acumulan las posiciones Y del centro de masa
+durante 500 ms después del aterrizaje (estado `aterrizaje_reciente` en
+la máquina de estados) y se calcula la desviación estándar. A menor
+oscilación, mayor puntuación de estabilidad (escala 0-100).
+
+---
+
+## Decisiones de rate limiting
+
+## `flask-limiter` con almacenamiento en memoria
+
+Se eligió `flask-limiter` por ser la solución más madura para Flask y no
+requerir Redis ni backends externos (almacenamiento `memory://`). Esto es
+suficiente para un servidor de desarrollo mono-proceso. En producción con
+múltiples workers se necesitaría un backend compartido (Redis/Memcached).
+
+## Límites graduales por tipo de endpoint
+
+| Tipo | Límite | Justificación |
+|------|--------|---------------|
+| Global (default) | 120/min | Cubre lectura/navegación normal |
+| Blueprints (usuarios, saltos) | 20/min | Escritura moderada a BD |
+| `POST /api/salto/calcular` | 10/min | Procesamiento pesado (MediaPipe + OpenCV) |
+| `POST /api/salto/video-anotado` | 5/min | Doble pasada de vídeo, CPU intensivo |
+
+Los endpoints GET de lectura (listar, progreso, comparativa) usan el
+default global (120/min), suficiente para polling desde el frontend.
+
+Si se excede el límite, el servidor devuelve **429 Too Many Requests**
+con un JSON `{"error": "Demasiadas solicitudes..."}`.
+

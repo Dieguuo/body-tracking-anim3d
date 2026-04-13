@@ -110,3 +110,27 @@ Relación 1:N con `ON DELETE CASCADE`: al eliminar un usuario se eliminan todos 
 - **Modularidad**: cada funcionalidad vive en `modules/<nombre>/` con arduino/mobile, backend y frontend propios.
 - **Autonomía de módulo**: cada módulo puede arrancarse y probarse de forma independiente.
 - **Puertos independientes**: cada módulo corre en su propio puerto (sensor → 5000, salto → 5001).
+
+## Seguridad
+
+| Capa | Mecanismo |
+|------|-----------|
+| **Transporte** | HTTPS con certificado autofirmado (`certs/`). Backend (Flask) y frontend (`scripts/https_server.py`) sirven por TLS cuando los certificados están presentes |
+| **Cabeceras HTTP** | `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy` en todas las respuestas |
+| **XSS** | Datos de usuario renderizados con `textContent` (no `innerHTML`) |
+| **SQL Injection** | Queries parametrizadas con `%s` en todos los endpoints |
+| **Rate Limiting** | `flask-limiter` — 120/min global, 20/min blueprints, 10/min cálculo de salto, 5/min vídeo anotado |
+| **Errores BD** | Mensajes sanitizados; detalles solo en logs del servidor |
+| **Tamaño upload** | `MAX_CONTENT_LENGTH` = 100 MB (Flask) + validación en frontend |
+
+## Acceso desde móvil (LAN)
+
+```
+Móvil (Chrome) ──HTTPS──→ Frontend (puerto 8443) ──HTTPS──→ Backend Flask (puerto 5001)
+                                                                    │
+                                                               MySQL local
+```
+
+- `getUserMedia()` necesita HTTPS → certificado autofirmado con SAN para IP LAN
+- `scripts/generate_cert.py` genera cert + key con la IP local detectada
+- `config.js` detecta protocolo automáticamente; override vía `localStorage.BACKEND_URL` para túneles

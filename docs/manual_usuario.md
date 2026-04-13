@@ -60,6 +60,8 @@ Abrir tres terminales y ejecutar en cada una:
 
 Una vez arrancado, abrir en el navegador: **http://localhost:8080**
 
+> **Para usar cámara desde móvil**, arrancar en modo HTTPS en lugar del servidor HTTP estándar. Ver la [sección 6](#6-acceso-desde-el-móvil).
+
 ---
 
 ## 3. Pantalla principal
@@ -233,18 +235,50 @@ Pulsar **"Detener"** para dejar de consultar al sensor.
 
 Si quieres grabar un salto con la cámara del móvil:
 
-1. El ordenador y el móvil deben estar en la **misma red WiFi**.
-2. En el ordenador, averigua tu IP local:
-   ```powershell
-   ipconfig
-   ```
-   Busca la dirección IPv4 (ej: `192.168.1.42`).
-3. En el móvil, abre el navegador y escribe: `http://192.168.1.42:8080`
-4. Si la cámara no se activa, puede ser porque el navegador exige HTTPS. Solución rápida en Chrome Android:
-   - Ir a `chrome://flags`
-   - Buscar **"Insecure origins treated as secure"**
-   - Añadir `http://192.168.1.42:8080`
-   - Reiniciar Chrome
+### Requisitos
+
+- El ordenador y el móvil deben estar en la **misma red WiFi**.
+- Certificados SSL generados (ver apartado siguiente).
+
+### Generar certificados (solo la primera vez)
+
+```powershell
+cd ruta\del\proyecto
+.\.venv\Scripts\python.exe scripts\generate_cert.py
+```
+
+Esto crea `certs/cert.pem` y `certs/key.pem` con la IP de tu red local incluida.
+
+### Arrancar en modo HTTPS
+
+Ejecutar por separado:
+
+| Terminal | Comando | Puerto |
+|----------|---------|--------|
+| Backend | `cd modules\salto\backend` → `python app.py` | 5001 (HTTPS auto) |
+| Frontend | `python scripts\https_server.py` | 8443 (HTTPS) |
+
+Flask detecta automáticamente los certificados en `certs/` y arranca por HTTPS.
+
+### Acceder desde el móvil
+
+1. En el móvil, abrir Chrome y navegar a: `https://192.168.x.x:8443` (sustituir por la IP del PC).
+2. El navegador mostrará un aviso de certificado no confiable. Pulsar **"Avanzado"** → **"Acceder de todos modos"**.
+3. La cámara se activará correctamente (HTTPS = Secure Context).
+
+> **Nota:** También debes aceptar el certificado del backend abriendo `https://192.168.x.x:5001` una vez y aceptando el aviso. Si no, las peticiones al API fallarán silenciosamente.
+
+### Acceder desde el PC
+
+Abrir en el navegador: **https://localhost:8443** y aceptar el certificado.
+
+### Compartir fuera de la red local
+
+Para compartir con alguien que no está en la misma WiFi:
+
+1. Usar **VS Code Port Forwarding** (panel Ports → Forward Port 5001 y 8443 → Visibility: Public).
+2. La persona remota abre la URL del frontend proporcionada por devtunnels.
+3. En la consola del navegador, configurar el backend: `localStorage.setItem('BACKEND_URL', 'https://url-del-tunnel-5001')` y recargar.
 
 ---
 
@@ -254,7 +288,7 @@ Si quieres grabar un salto con la cámara del móvil:
 |----------|---------------|----------|
 | "Error al conectar con localhost:5001" | Backend de salto no está arrancado | Ejecutar `python app.py` en `modules/salto/backend` |
 | "Error al conectar con localhost:5000" | Backend del sensor no está arrancado | Ejecutar `python app.py` en `modules/sensor/backend` |
-| La cámara no se activa | No se dieron permisos / no hay HTTPS | Aceptar permisos del navegador. Desde móvil, ver sección 6 |
+| La cámara no se activa | No se dieron permisos / no hay HTTPS | Aceptar permisos del navegador. Desde móvil: arrancar en modo HTTPS (sección 6) |
 | "Introduce una altura válida" | Campo de altura vacío o con valor ≤ 0 | Escribir la estatura en metros (ej: 1.75) |
 | "Extensión no permitida" | Formato de vídeo no soportado | Usar .mp4, .webm, .avi o .mov |
 | Badge rojo en sensor | Arduino no conectado o backend caído | Verificar USB + que el backend esté corriendo |
