@@ -358,14 +358,49 @@
 
                     <input type="range" id="landmarks-slider" min="0" max="0" step="1" value="0">
 
+                    <!-- Paso 4: Controles de animación -->
+                    <div class="landmarks-anim-controls">
+                        <button id="btn-landmarks-play" class="sensor-btn secondary-btn landmarks-anim-btn" type="button" title="Play / Pause">▶</button>
+                        <button id="btn-landmarks-speed" class="sensor-btn secondary-btn landmarks-anim-btn" type="button" title="Velocidad">×1</button>
+                        <span id="landmarks-fase-actual" class="landmarks-fase-label"></span>
+                    </div>
+
                     <div class="landmarks-switch">
                         <button id="btn-landmarks-2d" class="sensor-btn secondary-btn landmarks-switch-btn active" type="button">Vista 2D</button>
                         <button id="btn-landmarks-3d" class="sensor-btn secondary-btn landmarks-switch-btn" type="button">Vista 3D</button>
+                    </div>
+
+                    <!-- Paso 5: Toggle overlays biomecánicos -->
+                    <div class="landmarks-overlay-controls">
+                        <label class="landmarks-overlay-toggle">
+                            <input type="checkbox" id="chk-overlay-angulos"> Ángulos
+                        </label>
+                        <label class="landmarks-overlay-toggle">
+                            <input type="checkbox" id="chk-overlay-trayectoria"> Trayectoria CM
+                        </label>
+                        <label class="landmarks-overlay-toggle">
+                            <input type="checkbox" id="chk-overlay-fases"> Color por fase
+                        </label>
+                    </div>
+
+                    <!-- Paso 6: Comparativa de saltos -->
+                    <div id="landmarks-comparar-wrap" class="landmarks-comparar-wrap" style="display:none;">
+                        <label for="select-landmarks-comparar">Comparar con:</label>
+                        <select id="select-landmarks-comparar">
+                            <option value="">— Ninguno —</option>
+                        </select>
                     </div>
                 </div>
 
                 <canvas id="landmarks-canvas-2d" class="landmarks-canvas" width="640" height="360"></canvas>
                 <div id="landmarks-view-3d" class="landmarks-view-3d" style="display:none;"></div>
+
+                <!-- Paso 5: Panel lateral de métricas sincronizadas -->
+                <div id="landmarks-metricas-panel" class="landmarks-metricas-panel" style="display:none;">
+                    <div class="landmarks-metrica"><span class="lm-label">Rodilla</span> <span id="lm-met-rodilla" class="lm-valor">—</span></div>
+                    <div class="landmarks-metrica"><span class="lm-label">Cadera</span> <span id="lm-met-cadera" class="lm-valor">—</span></div>
+                    <div class="landmarks-metrica"><span class="lm-label">Fase</span> <span id="lm-met-fase" class="lm-valor">—</span></div>
+                </div>
             </div>
 
             <!-- Fase 8.3 — Descarga de vídeo anotado -->

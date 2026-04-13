@@ -258,14 +258,116 @@ Objetivo: extraer patrones y relaciones entre variables que no son evidentes a s
 
 ---
 
-## Fase futura — Visualización 3D interactiva
+## Fase 11 — Visualización 3D interactiva
 
 Prerequisito: Fases 7–8 completadas (curvas cinemáticas + timeline funcional).
 
-> **Nota:** esta fase se abordará cuando el análisis biomecánico y la visualización 2D estén sólidos. Un visor 3D sin datos completos detrás sería un envoltorio sin contenido.
+> **Nota:** esta fase se abordó una vez que el análisis biomecánico y la visualización 2D estaban sólidos.
 
-- [ ] Esqueleto animado del salto (replay de landmarks en 3D)
-- [ ] Visor interactivo con rotación/zoom (React + Three.js o similar)
-- [ ] Comparación lado a lado de dos intentos
-- [ ] Trayectorias y ángulos en escena 3D
-- [ ] Overlay técnico sobre el modelo (ángulos, fases, alertas)
+### 11.1 Persistencia de los 33 landmarks completos (completada)
+
+- [x] Extracción de los 33 landmarks de MediaPipe (x, y, z, visibility) en cada frame procesado
+- [x] Almacenamiento en columna `curvas_json` de la tabla `saltos` como array `landmarks_frames`
+- [x] Nuevo endpoint `GET /api/salto/<id>/landmarks` que devuelve los 33 landmarks frame a frame
+- [x] Inclusión opcional de landmarks en la respuesta de `POST /api/salto/calcular` (parámetro `incluir_landmarks=true`)
+- [x] Buffer local en frontend (`landmarksFramesLocalBuffer`) como fallback si el backend no devuelve landmarks
+
+### 11.2 Visor 2D de esqueleto con Canvas (completada)
+
+- [x] Panel `#panel-landmarks` en `salto.html` con canvas 2D (`#landmarks-canvas-2d`)
+- [x] Función `_dibujarFrame2D()` que renderiza los 33 joints (círculos naranja) y bones (líneas cyan)
+- [x] Mapa de conexiones `POSE_CONNECTIONS_33` con los 33 puntos del esqueleto MediaPipe
+- [x] Slider de frames para navegar frame a frame con indicador de timestamp
+- [x] Opacidad de joints basada en la visibilidad/confianza del landmark
+- [x] Mensaje "Sin landmarks" si un frame no tiene datos
+
+### 11.3 Visor 3D interactivo con Three.js (completada)
+
+- [x] Escena Three.js con cámara perspectiva (45° FOV), luces ambiental + direccional
+- [x] OrbitControls para rotación, pan y zoom con ratón
+- [x] 33 esferas (joints) + cilindros/líneas (bones) como geometría del esqueleto
+- [x] Función `_renderFrame3D()` que convierte coordenadas normalizadas a espacio 3D (x, y invertido, z negado)
+- [x] Carga de Three.js por CDN con fallback triple (esm.sh → unpkg → jsdelivr)
+- [x] Toggle 2D/3D con botones `#btn-landmarks-2d` / `#btn-landmarks-3d`
+- [x] `_disposeThreeViewer()` para limpieza de recursos WebGL al cambiar de modo
+- [x] Auto-resize con `ResizeObserver` para layout responsive
+- [x] Fallback automático a 2D si WebGL no está disponible
+
+### 11.4 Animación del salto (completada)
+
+- [x] Botones play/pause (`▶`/`⏸`) con `_startAnimation()` / `_stopAnimation()` basados en `setInterval`
+- [x] Control de velocidad con ciclo ×0.25 → ×0.5 → ×1 (botón `#btn-landmarks-speed`)
+- [x] Intervalo de animación calculado a partir de timestamps reales de los frames y velocidad seleccionada
+- [x] Indicador de fase actual (preparación → impulsión → vuelo → recepción) sincronizado con la animación (`#landmarks-fase-actual`)
+- [x] Helper `_getFaseParaFrame()` que busca la fase correspondiente a un frame en `datos.fases_salto`
+- [x] Esquema de colores por fase: azul (preparación), amarillo (impulsión), verde (vuelo), rojo (recepción)
+- [x] Loop automático: al llegar al último frame, vuelve al primero
+
+### 11.5 Overlays biomecánicos en 2D y 3D (completada)
+
+- [x] Checkbox para activar/desactivar overlay de ángulos articulares (`#chk-landmarks-angulos`)
+- [x] Arcos de ángulo de rodilla (landmarks 23→25→27 y 24→26→28) dibujados sobre canvas 2D con `_dibujarArcoAngulo2D()`
+- [x] Arcos de ángulo de cadera (landmarks 11→23→25 y 12→24→26) con valor numérico en grados
+- [x] Cálculo de ángulos con `_anguloEntreLandmarks()` (producto escalar + arccos)
+- [x] Checkbox para trayectoria del centro de masa (`#chk-landmarks-trayectoria`)
+- [x] Trayectoria CM en 2D: trail (promedio Y de caderas 23+24) sobre todos los frames con `_dibujarTrayectoriaCM2D()`
+- [x] Indicador del CM actual como punto blanco sobre la trayectoria
+- [x] Checkbox para colores por fase (`#chk-landmarks-fases`)
+- [x] Color de esqueleto dinámico en 2D (`_getBoneColorForFase()`) y 3D (material de joints y bones) según la fase activa
+- [x] Panel de métricas sincronizado al frame actual (`_actualizarMetricas()`)
+  - Ángulo de rodilla medio (izq + der / 2) en tiempo real
+  - Ángulo de cadera medio en tiempo real
+  - Nombre y color de la fase actual
+- [x] Panel de métricas auto-visible cuando cualquier overlay está activo
+
+### 11.6 Comparativa de saltos en el visor (completada)
+
+- [x] Selector de salto a comparar (`#select-landmarks-comparar`) poblado dinámicamente con `_poblarSelectorComparacion()`
+- [x] Carga de landmarks del salto de comparación desde `GET /api/salto/<id>/landmarks` con caché en `landmarksCache`
+- [x] Esqueleto ghost en 2D: `_dibujarFrameGhost2D()` con opacidad 35% y color rosa (`#ff8cff`)
+- [x] Esqueleto ghost en 3D: `_renderFrameGhost3D()` con joints y bones translúcidos (40% opacidad, rosa)
+- [x] Mapeo proporcional de frames entre salto principal y comparación (`_mapCompareFrame()`)
+- [x] Limpieza de geometría ghost con `_removeCompareGhost()` al cambiar o quitar la comparación
+- [x] Integración en `_actualizarFrameLandmarks()`: ghost se renderiza automáticamente en cada cambio de frame
+- [x] Filtrado: el salto actual no aparece en el selector de comparación
+
+## Fase 12 — Corrección de slow-motion y robustez del pipeline
+
+Prerequisito: Fases 2 y 11 completadas (procesamiento de vídeo + visualización funcionales).
+
+Objetivo: que el sistema produzca resultados correctos con vídeos grabados en cámara lenta (slow-motion), sin intervención manual del usuario.
+
+### 12.1 Detección automática de slow-motion (completada)
+
+- [x] Nuevo método `_detectar_factor_slowmo()` en `CalculoService` que ajusta una parábola a la trayectoria Y de la cadera durante la fase de vuelo
+- [x] Extracción de aceleración aparente: `a_aparente = 2 × coef_cuadrático × escala × fps²`
+- [x] Comparación con la gravedad real: `factor = sqrt(9.81 / g_aparente)`
+- [x] Rango de aplicación: factor > 1.3 para evitar falsos positivos; límite máximo 12.0
+- [x] Corrección automática de FPS: `fps_real = fps_video × factor`
+- [x] Aplicado en `calcular_vertical()` y `calcular_horizontal()` (todos los cálculos de tiempo usan `fps_real`)
+- [x] `factor_slowmo` añadido a `ResultadoSalto` y devuelto en la respuesta JSON
+- [x] El controlador usa `fps_real` para el enriquecimiento biomecánico y cinemático (Fases 6-7)
+- [x] Logging diagnóstico con prefijo `[SLOWMO]` para depuración
+
+### 12.2 Validación de vuelo tolerante a slow-motion (completada)
+
+- [x] Límites de tiempo de vuelo ampliados para no rechazar vuelos de vídeos en slow-motion
+- [x] Salto horizontal: máximo 8.0 s aparentes (antes 2.0 s)
+- [x] Salto vertical: máximo 5.0 s aparentes (antes 2.0 s)
+- [x] La corrección temporal precisa se aplica después con `_detectar_factor_slowmo()`
+
+### 12.3 Descarga de vídeo anotado en Windows (completada)
+
+- [x] Corregido `PermissionError` al descargar vídeo anotado en Windows (`send_file` mantenía el archivo abierto mientras `finally` intentaba borrarlo)
+- [x] Solución: leer el vídeo anotado en memoria antes de responder, permitiendo la limpieza de archivos temporales sin conflicto
+- [x] Limpieza de archivos con `try/except OSError` para evitar errores silenciosos
+
+### 12.4 Corrección del umbral de detección de vuelo en salto horizontal (completada)
+
+- [x] Diagnóstico del problema: salto horizontal devolvía ~336 cm en lugar de ~240 cm
+- [x] Causa raíz identificada: el umbral de Y para considerar "en aire" era de 0.99 px (`max(0.9, altura_ref × 0.0025)`), insuficiente para filtrar el ruido natural de MediaPipe (±5-7 px estando de pie)
+- [x] Consecuencia: el detector marcaba frame 16→120 como vuelo (104 de 121 frames = casi todo el vídeo), incluyendo la caminata antes y después del salto
+- [x] Corrección: nuevo umbral `max(8.0, altura_ref × 0.02)` ≈ 8 px, que supera el ruido de postura y solo detecta elevaciones reales de los pies
+- [x] Resultado verificado: despegue frame 19 → aterrizaje frame 84 (ventana correcta del salto), distancia corregida de 336 cm a ~240 cm
+- [x] Factor slow-motion también corregido en consecuencia: de 6.688 a 3.233 (parábola más limpia al tener la ventana de vuelo correcta)
+- [x] El umbral de salto vertical se mantiene inalterado (`max(1.2, altura_ref × 0.004)`)

@@ -1286,6 +1286,116 @@ body {
     position: relative;
 }
 
+/* Paso 4 — Controles de animación */
+.landmarks-anim-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.landmarks-anim-btn {
+    width: 44px !important;
+    height: 34px !important;
+    font-size: 0.85rem !important;
+    padding: 0 !important;
+    border-radius: 8px !important;
+    flex-shrink: 0;
+}
+
+.landmarks-fase-label {
+    font-size: 0.78rem;
+    color: #b9ffe8;
+    margin-left: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Paso 5 — Overlay toggles */
+.landmarks-overlay-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+.landmarks-overlay-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    color: #d8c6ea;
+    cursor: pointer;
+    user-select: none;
+}
+
+.landmarks-overlay-toggle input[type="checkbox"] {
+    accent-color: #59ffc7;
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+/* Paso 5 — Panel de métricas sincronizadas */
+.landmarks-metricas-panel {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.landmarks-metrica {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+.lm-label {
+    font-size: 0.7rem;
+    color: #a89aba;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.lm-valor {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #eee;
+}
+
+/* Paso 6 — Comparativa de saltos */
+.landmarks-comparar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.landmarks-comparar-wrap label {
+    color: #d8c6ea;
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+.landmarks-comparar-wrap select {
+    flex: 1;
+    min-width: 120px;
+    padding: 0.3rem 0.45rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.3);
+    color: #eee;
+    font-size: 0.82rem;
+}
+
+/* Esqueleto fantasma de comparación (opacidad reducida) */
+.landmarks-canvas-ghost {
+    opacity: 0.45;
+}
+
 /* Selector de comparación de saltos (Fase 8.2) */
 #comparar-salto-wrap {
     display: none;

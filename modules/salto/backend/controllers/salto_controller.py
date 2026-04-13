@@ -60,7 +60,9 @@ class SaltoController:
 
         # Fase 6+7: análisis avanzado solo si se detectó un salto válido
         if resultado.frame_despegue is not None and resultado.frame_aterrizaje is not None:
-            self._enriquecer_con_analisis(resultado, frames, info.fps)
+            # Usar FPS corregido si se detectó slow-motion
+            fps_real = info.fps * resultado.factor_slowmo
+            self._enriquecer_con_analisis(resultado, frames, fps_real)
 
         resultado.landmarks_frames = self._serializar_landmarks(frames)
 

@@ -40,6 +40,7 @@ class ResultadoSalto:
     velocidades_articulares: dict | None = None
     resumen_gesto: dict | None = None
     landmarks_frames: list | None = None
+    factor_slowmo: float = 1.0  # >1 si se detectó slow-motion
 
 
 class CalculoService:
@@ -74,9 +75,13 @@ class CalculoService:
                 confianza=0.0,
             )
 
+        # Corrección automática de slow-motion
+        factor_slowmo = self._detectar_factor_slowmo(frames, despegue, aterrizaje, fps, altura_real_m)
+        fps_real = fps * factor_slowmo
+
         angulo_rodilla, angulo_cadera = self._calcular_angulos_despegue(frames, despegue)
 
-        tiempo_vuelo = max(0.0, (aterrizaje - despegue) / fps)
+        tiempo_vuelo = max(0.0, (aterrizaje - despegue) / fps_real)
 
         # ── Método 1: Cinemática ──
         altura_cin_cm = (1 / 8) * GRAVEDAD * (tiempo_vuelo ** 2) * 100
@@ -153,6 +158,7 @@ class CalculoService:
             potencia_w=potencia_w,
             asimetria_pct=asimetria_pct,
             estabilidad_aterrizaje=estabilidad,
+            factor_slowmo=factor_slowmo,
         )
 
     def calcular_horizontal(
@@ -170,14 +176,25 @@ class CalculoService:
         Usa la altura del usuario en metros (altura_real_m) y la altura
         medida en píxeles para calcular el factor de escala.
         """
+        import logging
+        log = logging.getLogger(__name__)
+        log.info("[HORIZ] Frames: %d, FPS: %.1f, altura_real: %.2f m", len(frames), fps, altura_real_m)
+
         despegue, aterrizaje, confianza = self._detectar_vuelo(frames, "horizontal", fps)
+        log.info("[HORIZ] Vuelo: despegue=%s, aterrizaje=%s, confianza=%.3f", despegue, aterrizaje, confianza)
 
         if despegue is None or aterrizaje is None:
+            log.warning("[HORIZ] No se detectó fase de vuelo → 0 cm")
             return ResultadoSalto(
                 tipo_salto="horizontal",
                 distancia=0.0,
                 confianza=0.0,
             )
+
+        # Corrección automática de slow-motion
+        factor_slowmo = self._detectar_factor_slowmo(frames, despegue, aterrizaje, fps, altura_real_m)
+        fps_real = fps * factor_slowmo
+        log.info("[HORIZ] Slow-motion: factor=%.2f, fps_video=%.1f, fps_real=%.1f", factor_slowmo, fps, fps_real)
 
         angulo_rodilla, angulo_cadera = self._calcular_angulos_despegue(frames, despegue)
 
@@ -188,6 +205,7 @@ class CalculoService:
             altura_px = self._buscar_altura_px(frames, despegue)
 
         if not altura_px or altura_px == 0:
+            log.warning("[HORIZ] Sin altura en px → 0 cm")
             return ResultadoSalto(
                 tipo_salto="horizontal",
                 distancia=0.0,
@@ -199,7 +217,9 @@ class CalculoService:
 
         # Desplazamiento horizontal robusto en píxeles durante la ventana de vuelo.
         desplazamiento_px = self._desplazamiento_horizontal_robusto(frames, despegue, aterrizaje)
+        log.info("[HORIZ] altura_px=%.1f, factor_escala=%.5f, desplaz_px=%s", altura_px, factor_escala, desplazamiento_px)
         if desplazamiento_px is None or desplazamiento_px <= 0:
+            log.warning("[HORIZ] Desplazamiento horizontal nulo → 0 cm")
             return ResultadoSalto(
                 tipo_salto="horizontal",
                 distancia=0.0,
@@ -209,7 +229,7 @@ class CalculoService:
         # D_real = Dp * S  →  en metros, convertir a cm
         distancia_m = desplazamiento_px * factor_escala
         distancia_cm = max(0.0, distancia_m * 100)
-        tiempo_vuelo = (aterrizaje - despegue) / fps
+        tiempo_vuelo = (aterrizaje - despegue) / fps_real
 
         # Guardarraíl para evitar valores colapsados por detección espuria.
         if tiempo_vuelo > 0.12 and distancia_cm < 5:
@@ -233,6 +253,7 @@ class CalculoService:
             potencia_w=potencia_w,
             asimetria_pct=asimetria_pct,
             estabilidad_aterrizaje=estabilidad,
+            factor_slowmo=factor_slowmo,
         )
 
     def _detectar_vuelo(self, frames: list[FramePies], tipo_salto: str, fps: float) -> tuple[int | None, int | None, float]:
@@ -273,7 +294,10 @@ class CalculoService:
         if tipo_salto == "vertical":
             umbral_altura = max(1.2, altura_ref * 0.004)
         else:
-            umbral_altura = max(0.9, altura_ref * 0.0025)
+            # Horizontal: umbral más alto para filtrar ruido de postura/caminata.
+            # Un salto horizontal eleva los pies al menos 3-5 cm (~6-12 px típicos).
+            # El ruido natural estando de pie es ~5-7 px, así que necesitamos superar eso.
+            umbral_altura = max(8.0, altura_ref * 0.02)
 
         # 3. Detectar tramos en aire (pies claramente por encima del baseline).
         en_aire = y_suave < (y_base - umbral_altura)
@@ -325,8 +349,12 @@ class CalculoService:
             return None, None, 0.0
 
         # Validación temporal para descartar falsos positivos muy cortos.
+        # Se usan límites generosos porque el vídeo puede estar en slow-motion
+        # (el FPS del contenedor no refleja el tiempo real). La corrección
+        # temporal precisa se aplica después con _detectar_factor_slowmo().
         tiempo_vuelo = (aterrizaje - despegue) / fps if fps > 0 else 0.0
-        if tiempo_vuelo < 0.05 or tiempo_vuelo > 2.0:
+        max_vuelo = 8.0 if tipo_salto == "horizontal" else 5.0
+        if tiempo_vuelo < 0.05 or tiempo_vuelo > max_vuelo:
             return None, None, 0.0
 
         frames_vuelo = frames[despegue:aterrizaje + 1]
@@ -553,6 +581,102 @@ class CalculoService:
         penalizacion_conf = max(0.0, (1.0 - float(confianza)) * 35.0)
         score = 100.0 - penalizacion_asim - penalizacion_conf
         return round(max(0.0, min(100.0, score)), 2)
+
+    def _detectar_factor_slowmo(
+        self,
+        frames: list[FramePies],
+        despegue: int,
+        aterrizaje: int,
+        fps_video: float,
+        altura_real_m: float,
+    ) -> float:
+        """
+        Detecta si el vídeo fue grabado en cámara lenta comparando la
+        aceleración vertical aparente con la gravedad real (9.81 m/s²).
+
+        En la fase de vuelo, la trayectoria vertical sigue una parábola:
+            y(t) = y₀ + v₀·t + ½·a·t²
+
+        Se ajusta una parábola a las coordenadas Y de la cadera durante
+        el vuelo y se extrae la aceleración aparente.
+
+        factor = sqrt(g_real / g_aparente)
+        fps_real = fps_video * factor
+
+        Devuelve el factor (>1 si es slow-motion, ~1 si es velocidad normal).
+        Se limita el rango a [1.0, 12.0] para evitar resultados absurdos.
+        """
+        import logging
+        log = logging.getLogger(__name__)
+
+        n_vuelo = aterrizaje - despegue + 1
+        if n_vuelo < 5:
+            log.info("[SLOWMO] Vuelo muy corto (%d frames), no se puede estimar", n_vuelo)
+            return 1.0
+
+        # Usar coordenada Y de la cadera (más estable que los pies durante el vuelo).
+        y_vals = []
+        for i in range(despegue, aterrizaje + 1):
+            f = frames[i]
+            y = f.cadera_y if f.cadera_y is not None else self._promedio_y_pies(f)
+            y_vals.append(y)
+
+        # Interpolar Nones
+        y_interp = self._interpolar_nones(y_vals)
+        if y_interp is None or len(y_interp) < 5:
+            log.info("[SLOWMO] Datos Y insuficientes, asumiendo factor=1.0")
+            return 1.0
+
+        # Ajustar parábola: y = a·t² + b·t + c  (t en frames)
+        t_frames = np.arange(len(y_interp), dtype=float)
+        try:
+            coefs = np.polyfit(t_frames, y_interp, 2)
+        except (np.linalg.LinAlgError, ValueError):
+            log.info("[SLOWMO] Fallo en polyfit, asumiendo factor=1.0")
+            return 1.0
+
+        a_px_per_frame2 = coefs[0]  # aceleración en píxeles/frame²
+
+        # En coordenadas de imagen, Y crece hacia abajo,
+        # así que la gravedad produce a > 0 (la cadera cae = Y aumenta en la 2ª mitad).
+        # La aceleración real es |2*a| (porque y = ½·a·t², polyfit da coef de t² = ½·a).
+        a_px_per_frame2 = abs(a_px_per_frame2) * 2.0
+
+        if a_px_per_frame2 < 1e-6:
+            log.info("[SLOWMO] Aceleración aparente ~0, asumiendo factor=1.0")
+            return 1.0
+
+        # Convertir de píxeles/frame² a m/s²:
+        # a_real = a_px * escala * fps²
+        altura_px = self._altura_referencia_px(frames)
+        if not altura_px or altura_px <= 0:
+            log.info("[SLOWMO] Sin altura en px, asumiendo factor=1.0")
+            return 1.0
+
+        escala = altura_real_m / altura_px  # metros/píxel
+        g_aparente = a_px_per_frame2 * escala * (fps_video ** 2)
+
+        if g_aparente < 0.1:
+            log.info("[SLOWMO] g_aparente=%.3f demasiado bajo, asumiendo factor=1.0", g_aparente)
+            return 1.0
+
+        factor = float(np.sqrt(GRAVEDAD / g_aparente))
+
+        log.info(
+            "[SLOWMO] a_px=%.4f px/f², escala=%.6f m/px, g_aparente=%.3f m/s², factor=%.2f",
+            a_px_per_frame2, escala, g_aparente, factor,
+        )
+
+        # Solo aplicar si el factor es significativo (>1.3 = al menos 30% slow-mo).
+        # Si está entre 0.7 y 1.3, asumimos velocidad normal.
+        if 0.7 <= factor <= 1.3:
+            log.info("[SLOWMO] Factor cercano a 1.0 (%.2f), no se aplica corrección", factor)
+            return 1.0
+
+        # Limitar rango razonable: los móviles graban a 2x–8x slow-mo típicamente.
+        factor = max(1.0, min(12.0, factor))
+        log.info("[SLOWMO] Aplicando corrección slow-motion: factor=%.2f", factor)
+        return factor
 
     @staticmethod
     def _calcular_potencia_horizontal(

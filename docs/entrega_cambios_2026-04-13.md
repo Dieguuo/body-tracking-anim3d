@@ -196,3 +196,34 @@ Validacion minima:
 - docs/historial_tecnico_2026-04-13.md
 - docs/checklist_validacion_salto_vh_realtime_galeria.md
 - scripts/README.md
+
+## 10. Visualizacion 3D — ultimos 3 hitos del roadmap (Fase 11)
+
+### 10.1 Animacion del salto (11.4)
+
+- Play/pause con `_startAnimation()` / `_stopAnimation()` basados en `setInterval`.
+- Control de velocidad ciclico: x0.25, x0.5, x1.
+- Intervalo calculado a partir de timestamps reales de los frames y velocidad seleccionada.
+- Indicador de fase actual (preparacion, impulsion, vuelo, recepcion) sincronizado con la animacion.
+- Helper `_getFaseParaFrame()` busca la fase en `datos.fases_salto`.
+- Colores por fase: azul (preparacion), amarillo (impulsion), verde (vuelo), rojo (recepcion).
+- Loop automatico al final del ultimo frame.
+
+### 10.2 Overlays biomecanicos en 2D y 3D (11.5)
+
+- Checkboxes independientes para angulos articulares, trayectoria CM y colores por fase.
+- Arcos de angulo de rodilla (landmarks 23-25-27 y 24-26-28) y cadera (11-23-25 y 12-24-26) dibujados en canvas 2D con valor numerico en grados.
+- Trayectoria del centro de masa (promedio Y caderas 23+24) como trail sobre todos los frames, con indicador del CM actual.
+- Color de esqueleto dinamico en 2D y 3D segun la fase activa del salto.
+- Panel de metricas sincronizado al frame actual: angulo medio rodilla, angulo medio cadera, fase activa con color.
+- Panel auto-visible cuando cualquier overlay esta activo.
+
+### 10.3 Comparativa de saltos en el visor (11.6)
+
+- Selector de salto a comparar poblado dinamicamente con los saltos del mismo usuario.
+- Carga de landmarks del salto de comparacion desde `GET /api/salto/<id>/landmarks` con cache en `landmarksCache`.
+- Esqueleto ghost en 2D: opacidad 35%, color rosa (#ff8cff).
+- Esqueleto ghost en 3D: joints y bones translucidos, 40% opacidad, rosa.
+- Mapeo proporcional de frames entre salto principal y comparacion (`_mapCompareFrame()`).
+- Limpieza de geometria ghost al cambiar o desactivar la comparacion.
+- El salto actual no aparece en el selector.

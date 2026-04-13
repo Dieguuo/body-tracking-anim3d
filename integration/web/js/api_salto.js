@@ -71,7 +71,17 @@ const landmarksViewerState = {
     frames: [],
     currentFrame: 0,
     mode: '2d',
-    three: null
+    three: null,
+    // Paso 4 — Animación
+    playing: false,
+    speed: 1,
+    animTimerId: null,
+    // Paso 5 — Datos del salto (fases, curvas) para overlays
+    datos: null,
+    overlays: { angulos: false, trayectoria: false, fases: false },
+    // Paso 6 — Comparación
+    compareFrames: null,
+    compareIdSalto: null
 };
 
 function fijarTamanoGraficasAnalitica() {
@@ -2377,7 +2387,22 @@ function _landmarksUI() {
         canvas2d: document.getElementById('landmarks-canvas-2d'),
         view3d: document.getElementById('landmarks-view-3d'),
         btn2d: document.getElementById('btn-landmarks-2d'),
-        btn3d: document.getElementById('btn-landmarks-3d')
+        btn3d: document.getElementById('btn-landmarks-3d'),
+        // Paso 4
+        btnPlay: document.getElementById('btn-landmarks-play'),
+        btnSpeed: document.getElementById('btn-landmarks-speed'),
+        faseActual: document.getElementById('landmarks-fase-actual'),
+        // Paso 5
+        chkAngulos: document.getElementById('chk-overlay-angulos'),
+        chkTrayectoria: document.getElementById('chk-overlay-trayectoria'),
+        chkFases: document.getElementById('chk-overlay-fases'),
+        metricasPanel: document.getElementById('landmarks-metricas-panel'),
+        metRodilla: document.getElementById('lm-met-rodilla'),
+        metCadera: document.getElementById('lm-met-cadera'),
+        metFase: document.getElementById('lm-met-fase'),
+        // Paso 6
+        compararWrap: document.getElementById('landmarks-comparar-wrap'),
+        selectComparar: document.getElementById('select-landmarks-comparar')
     };
 }
 
@@ -2448,8 +2473,12 @@ function _dibujarFrame2D(frame) {
         return;
     }
 
+    // Color de hueso: por fase (si overlay activo) o por defecto
+    const faseColor = _getBoneColorForFase(frame?.frame_idx ?? landmarksViewerState.currentFrame);
+    const defaultBoneColor = 'rgba(89, 255, 199, 0.82)';
+
     ctx.lineWidth = 2;
-    ctx.strokeStyle = 'rgba(89, 255, 199, 0.82)';
+    ctx.strokeStyle = faseColor || defaultBoneColor;
     POSE_CONNECTIONS_33.forEach(([a, b]) => {
         const pa = lms[a];
         const pb = lms[b];
@@ -2475,6 +2504,32 @@ function _dibujarFrame2D(frame) {
         ctx.fillStyle = `rgba(255, 160, 110, ${0.3 + (0.7 * vis)})`;
         ctx.fill();
     });
+
+    // Overlay: ángulos
+    if (landmarksViewerState.overlays.angulos) {
+        const rodIzq = _anguloEntreLandmarks(lms, 23, 25, 27);
+        const rodDer = _anguloEntreLandmarks(lms, 24, 26, 28);
+        const cadIzq = _anguloEntreLandmarks(lms, 11, 23, 25);
+        const cadDer = _anguloEntreLandmarks(lms, 12, 24, 26);
+        if (rodIzq != null) _dibujarArcoAngulo2D(ctx, lms, w, h, 23, 25, 27, rodIzq);
+        if (rodDer != null) _dibujarArcoAngulo2D(ctx, lms, w, h, 24, 26, 28, rodDer);
+        if (cadIzq != null) _dibujarArcoAngulo2D(ctx, lms, w, h, 11, 23, 25, cadIzq);
+        if (cadDer != null) _dibujarArcoAngulo2D(ctx, lms, w, h, 12, 24, 26, cadDer);
+    }
+
+    // Overlay: trayectoria centro de masa
+    if (landmarksViewerState.overlays.trayectoria) {
+        _dibujarTrayectoriaCM2D(ctx, landmarksViewerState.frames, w, h);
+        // Indicador del centro de masa actual
+        if (lms[23] && lms[24]) {
+            const cmx = ((lms[23].x + lms[24].x) / 2) * w;
+            const cmy = ((lms[23].y + lms[24].y) / 2) * h;
+            ctx.beginPath();
+            ctx.arc(cmx, cmy, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+        }
+    }
 }
 
 async function _cargarThreeDeps() {
@@ -2665,11 +2720,19 @@ function _renderFrame3D(frame) {
         };
     });
 
+    // Color por fase (si overlay activo)
+    const faseColor3D = _getBoneColorForFase(frame?.frame_idx ?? landmarksViewerState.currentFrame);
+
     inst.joints.forEach((mesh, idx) => {
         const p = points[idx];
         mesh.visible = Boolean(p);
         if (p) {
             mesh.position.set(p.x, p.y, p.z);
+        }
+        if (faseColor3D && mesh.material) {
+            mesh.material.color.set(faseColor3D);
+        } else if (mesh.material) {
+            mesh.material.color.set(0xff9933);
         }
     });
 
@@ -2688,6 +2751,11 @@ function _renderFrame3D(frame) {
         b.positions[5] = pb.z;
         b.line.geometry.attributes.position.needsUpdate = true;
         b.line.visible = true;
+        if (faseColor3D && b.line.material) {
+            b.line.material.color.set(faseColor3D);
+        } else if (b.line.material) {
+            b.line.material.color.set(0x59ffc7);
+        }
     });
 }
 
@@ -2714,6 +2782,18 @@ function _actualizarFrameLandmarks(frameIndex) {
 
     _dibujarFrame2D(frame);
     _renderFrame3D(frame);
+
+    // Métricas sincronizadas y overlays
+    _actualizarMetricas(frame);
+
+    // Ghost de comparación
+    if (landmarksViewerState.compareFrames) {
+        const ghostFrame = _mapCompareFrame(idx);
+        if (ghostFrame) {
+            if (landmarksViewerState.mode === '2d') _dibujarFrameGhost2D(ghostFrame);
+            else _renderFrameGhost3D(ghostFrame);
+        }
+    }
 }
 
 async function _cambiarModoLandmarks(mode) {
@@ -2743,6 +2823,7 @@ function _bindLandmarksControls() {
     const { slider, btn2d, btn3d } = _landmarksUI();
     if (slider && !slider.dataset.bound) {
         slider.addEventListener('input', (ev) => {
+            _stopAnimation();
             _actualizarFrameLandmarks(Number(ev.target.value));
         });
         slider.dataset.bound = '1';
@@ -2759,23 +2840,419 @@ function _bindLandmarksControls() {
         btn3d.addEventListener('click', () => {
             _cambiarModoLandmarks('3d').catch((error) => {
                 _setLandmarksEstado(`No se pudo activar la vista 3D: ${error.message}. Se mantiene la vista 2D.`);
-                _cambiarModoLandmarks('2d').catch(() => {
-                    // Mantener estado actual si también falla el fallback.
-                });
+                _cambiarModoLandmarks('2d').catch(() => {});
             });
         });
         btn3d.dataset.bound = '1';
     }
+
+    // ── Paso 4 — Controles de animación ──
+    const { btnPlay, btnSpeed } = _landmarksUI();
+    if (btnPlay && !btnPlay.dataset.bound) {
+        btnPlay.addEventListener('click', () => {
+            if (landmarksViewerState.playing) {
+                _stopAnimation();
+            } else {
+                _startAnimation();
+            }
+        });
+        btnPlay.dataset.bound = '1';
+    }
+    if (btnSpeed && !btnSpeed.dataset.bound) {
+        btnSpeed.addEventListener('click', () => {
+            const speeds = [0.25, 0.5, 1];
+            const cur = landmarksViewerState.speed;
+            const nextIdx = (speeds.indexOf(cur) + 1) % speeds.length;
+            landmarksViewerState.speed = speeds[nextIdx];
+            btnSpeed.textContent = `×${speeds[nextIdx]}`;
+            if (landmarksViewerState.playing) {
+                _stopAnimation();
+                _startAnimation();
+            }
+        });
+        btnSpeed.dataset.bound = '1';
+    }
+
+    // ── Paso 5 — Toggle overlays ──
+    const { chkAngulos, chkTrayectoria, chkFases } = _landmarksUI();
+    const overlayHandler = (key) => (ev) => {
+        landmarksViewerState.overlays[key] = ev.target.checked;
+        _actualizarOverlays();
+        _actualizarFrameLandmarks(landmarksViewerState.currentFrame);
+    };
+    if (chkAngulos && !chkAngulos.dataset.bound) {
+        chkAngulos.addEventListener('change', overlayHandler('angulos'));
+        chkAngulos.dataset.bound = '1';
+    }
+    if (chkTrayectoria && !chkTrayectoria.dataset.bound) {
+        chkTrayectoria.addEventListener('change', overlayHandler('trayectoria'));
+        chkTrayectoria.dataset.bound = '1';
+    }
+    if (chkFases && !chkFases.dataset.bound) {
+        chkFases.addEventListener('change', overlayHandler('fases'));
+        chkFases.dataset.bound = '1';
+    }
+
+    // ── Paso 6 — Selector de comparación ──
+    const { selectComparar } = _landmarksUI();
+    if (selectComparar && !selectComparar.dataset.bound) {
+        selectComparar.addEventListener('change', async (ev) => {
+            const idComp = Number(ev.target.value);
+            if (!idComp) {
+                landmarksViewerState.compareFrames = null;
+                landmarksViewerState.compareIdSalto = null;
+                _removeCompareGhost();
+                _actualizarFrameLandmarks(landmarksViewerState.currentFrame);
+                return;
+            }
+            try {
+                let frames = landmarksCache.get(idComp);
+                if (!frames) {
+                    const resp = await fetch(`${getBackendBaseUrl()}/api/salto/${idComp}/landmarks`);
+                    const payload = await resp.json().catch(() => ({}));
+                    if (!resp.ok) throw new Error(payload.error || `HTTP ${resp.status}`);
+                    frames = _normalizarFramesLandmarks(payload.frames || []);
+                    landmarksCache.set(idComp, frames);
+                }
+                landmarksViewerState.compareFrames = frames;
+                landmarksViewerState.compareIdSalto = idComp;
+                _actualizarFrameLandmarks(landmarksViewerState.currentFrame);
+            } catch (err) {
+                _setLandmarksEstado(`No se pudo cargar el salto de comparación: ${err.message}`);
+            }
+        });
+        selectComparar.dataset.bound = '1';
+    }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// Paso 4 — Animación (play / pause / velocidad)
+// ═══════════════════════════════════════════════════════════════════
+
+function _startAnimation() {
+    const total = landmarksViewerState.frames.length;
+    if (total < 2) return;
+
+    landmarksViewerState.playing = true;
+    const { btnPlay } = _landmarksUI();
+    if (btnPlay) btnPlay.textContent = '⏸';
+
+    // Calcular intervalo entre frames basándose en timestamps reales
+    const f0 = landmarksViewerState.frames[0];
+    const fN = landmarksViewerState.frames[total - 1];
+    const duracionTotal = (fN.timestamp_s || 0) - (f0.timestamp_s || 0);
+    const intervaloBase = duracionTotal > 0 ? (duracionTotal / total) * 1000 : 33;
+    const intervalo = Math.max(8, intervaloBase / landmarksViewerState.speed);
+
+    landmarksViewerState.animTimerId = setInterval(() => {
+        let next = landmarksViewerState.currentFrame + 1;
+        if (next >= total) next = 0;
+        _actualizarFrameLandmarks(next);
+    }, intervalo);
+}
+
+function _stopAnimation() {
+    landmarksViewerState.playing = false;
+    if (landmarksViewerState.animTimerId) {
+        clearInterval(landmarksViewerState.animTimerId);
+        landmarksViewerState.animTimerId = null;
+    }
+    const { btnPlay } = _landmarksUI();
+    if (btnPlay) btnPlay.textContent = '▶';
+}
+
+/** Devuelve la fase del salto a la que pertenece un frame_idx concreto. */
+function _getFaseParaFrame(frameIdx) {
+    const datos = landmarksViewerState.datos;
+    if (!datos?.fases_salto || !Array.isArray(datos.fases_salto)) return null;
+    for (const fase of datos.fases_salto) {
+        if (frameIdx >= fase.frame_inicio && frameIdx <= fase.frame_fin) {
+            return fase;
+        }
+    }
+    return null;
+}
+
+const _FASE_COLORES = {
+    preparatoria: '#5b8fff',
+    impulsion: '#ffe44d',
+    vuelo: '#59ffc7',
+    recepcion: '#ff6e6e'
+};
+
+const _FASE_NOMBRES = {
+    preparatoria: 'Preparación',
+    impulsion: 'Impulsión',
+    vuelo: 'Vuelo',
+    recepcion: 'Recepción'
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// Paso 5 — Overlays biomecánicos
+// ═══════════════════════════════════════════════════════════════════
+
+/** Calcula el ángulo entre tres landmarks (en grados). */
+function _anguloEntreLandmarks(lms, idxA, idxB, idxC) {
+    const a = lms[idxA], b = lms[idxB], c = lms[idxC];
+    if (!a || !b || !c) return null;
+    const ba = { x: a.x - b.x, y: a.y - b.y };
+    const bc = { x: c.x - b.x, y: c.y - b.y };
+    const dot = ba.x * bc.x + ba.y * bc.y;
+    const magA = Math.sqrt(ba.x * ba.x + ba.y * ba.y);
+    const magC = Math.sqrt(bc.x * bc.x + bc.y * bc.y);
+    if (magA < 1e-6 || magC < 1e-6) return null;
+    const cosTheta = Math.max(-1, Math.min(1, dot / (magA * magC)));
+    return Math.round(Math.acos(cosTheta) * (180 / Math.PI));
+}
+
+/** Dibuja un arco de ángulo sobre el canvas 2D. */
+function _dibujarArcoAngulo2D(ctx, lms, w, h, idxA, idxB, idxC, label) {
+    const a = lms[idxA], b = lms[idxB], c = lms[idxC];
+    if (!a || !b || !c) return;
+    const bx = b.x * w, by = b.y * h;
+    const angA = Math.atan2((a.y * h) - by, (a.x * w) - bx);
+    const angC = Math.atan2((c.y * h) - by, (c.x * w) - bx);
+    const radio = 22;
+    ctx.beginPath();
+    ctx.arc(bx, by, radio, Math.min(angA, angC), Math.max(angA, angC));
+    ctx.strokeStyle = '#ffe44d';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    const midAng = (angA + angC) / 2;
+    const tx = bx + Math.cos(midAng) * (radio + 12);
+    const ty = by + Math.sin(midAng) * (radio + 12);
+    ctx.fillStyle = '#ffe44d';
+    ctx.font = '11px Segoe UI';
+    ctx.fillText(`${label}°`, tx, ty);
+}
+
+/** Dibuja la trayectoria del centro de masa (promedio caderas) en 2D. */
+function _dibujarTrayectoriaCM2D(ctx, frames, w, h) {
+    if (!frames || frames.length < 2) return;
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = 1.2;
+    let started = false;
+    for (const frame of frames) {
+        const lms = frame?.landmarks;
+        if (!lms || !lms[23] || !lms[24]) continue;
+        const cx = ((lms[23].x + lms[24].x) / 2) * w;
+        const cy = ((lms[23].y + lms[24].y) / 2) * h;
+        if (!started) { ctx.moveTo(cx, cy); started = true; }
+        else { ctx.lineTo(cx, cy); }
+    }
+    ctx.stroke();
+}
+
+/** Aplica color del esqueleto según la fase actual del salto. */
+function _getBoneColorForFase(frameIdx) {
+    if (!landmarksViewerState.overlays.fases) return null;
+    const fase = _getFaseParaFrame(frameIdx);
+    if (!fase) return null;
+    return _FASE_COLORES[fase.fase] || null;
+}
+
+/** Actualiza el panel de métricas sincronizado al frame actual. */
+function _actualizarMetricas(frame) {
+    const { metricasPanel, metRodilla, metCadera, metFase, faseActual } = _landmarksUI();
+    const datos = landmarksViewerState.datos;
+    const lms = frame?.landmarks;
+
+    // Mostrar u ocultar panel según overlays activos
+    const anyOverlay = landmarksViewerState.overlays.angulos || landmarksViewerState.overlays.trayectoria || landmarksViewerState.overlays.fases;
+    if (metricasPanel) metricasPanel.style.display = anyOverlay ? 'grid' : 'none';
+
+    // Ángulos en tiempo real del frame actual
+    if (metRodilla && lms) {
+        // Rodilla: cadera(23/24) → rodilla(25/26) → tobillo(27/28)
+        const rodillaIzq = _anguloEntreLandmarks(lms, 23, 25, 27);
+        const rodillaDer = _anguloEntreLandmarks(lms, 24, 26, 28);
+        if (rodillaIzq != null && rodillaDer != null) {
+            metRodilla.textContent = `${Math.round((rodillaIzq + rodillaDer) / 2)}°`;
+        } else {
+            metRodilla.textContent = '—';
+        }
+    }
+    if (metCadera && lms) {
+        // Cadera: hombro(11/12) → cadera(23/24) → rodilla(25/26)
+        const caderaIzq = _anguloEntreLandmarks(lms, 11, 23, 25);
+        const caderaDer = _anguloEntreLandmarks(lms, 12, 24, 26);
+        if (caderaIzq != null && caderaDer != null) {
+            metCadera.textContent = `${Math.round((caderaIzq + caderaDer) / 2)}°`;
+        } else {
+            metCadera.textContent = '—';
+        }
+    }
+
+    // Fase actual
+    const frameIdx = frame?.frame_idx ?? landmarksViewerState.currentFrame;
+    const fase = _getFaseParaFrame(frameIdx);
+    const nombreFase = fase ? (_FASE_NOMBRES[fase.fase] || fase.fase) : '—';
+    const colorFase = fase ? (_FASE_COLORES[fase.fase] || '#eee') : '#eee';
+    if (metFase) { metFase.textContent = nombreFase; metFase.style.color = colorFase; }
+    if (faseActual) { faseActual.textContent = nombreFase; faseActual.style.color = colorFase; }
+}
+
+/** Actualiza la visibilidad de controles de overlay. */
+function _actualizarOverlays() {
+    const { metricasPanel } = _landmarksUI();
+    const anyActive = landmarksViewerState.overlays.angulos || landmarksViewerState.overlays.trayectoria || landmarksViewerState.overlays.fases;
+    if (metricasPanel) metricasPanel.style.display = anyActive ? 'grid' : 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Paso 6 — Comparación de saltos
+// ═══════════════════════════════════════════════════════════════════
+
+/** Dibuja el esqueleto de un segundo salto (ghost) en canvas 2D. */
+function _dibujarFrameGhost2D(frame) {
+    const { canvas2d } = _landmarksUI();
+    if (!canvas2d) return;
+    const ctx = canvas2d.getContext('2d');
+    const w = canvas2d.width, h = canvas2d.height;
+    const lms = Array.isArray(frame?.landmarks) ? frame.landmarks : [];
+    if (lms.length === 0) return;
+
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(255, 140, 255, 0.7)';
+    POSE_CONNECTIONS_33.forEach(([a, b]) => {
+        const pa = lms[a], pb = lms[b];
+        if (!pa || !pb) return;
+        if (!Number.isFinite(pa.x) || !Number.isFinite(pb.x)) return;
+        ctx.beginPath();
+        ctx.moveTo(pa.x * w, pa.y * h);
+        ctx.lineTo(pb.x * w, pb.y * h);
+        ctx.stroke();
+    });
+    lms.forEach((p) => {
+        if (!p || !Number.isFinite(p.x)) return;
+        ctx.beginPath();
+        ctx.arc(p.x * w, p.y * h, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 140, 255, 0.6)';
+        ctx.fill();
+    });
+    ctx.restore();
+}
+
+/** Renderiza el esqueleto ghost en la escena 3D. */
+function _renderFrameGhost3D(frame) {
+    const inst = landmarksViewerState.three;
+    if (!inst) return;
+    const lms = Array.isArray(frame?.landmarks) ? frame.landmarks : [];
+
+    // Crear geometría ghost si no existe
+    if (!inst.ghostJoints) {
+        const mat = new inst.THREE.MeshStandardMaterial({ color: 0xff8cff, roughness: 0.5, transparent: true, opacity: 0.4 });
+        inst.ghostJoints = Array.from({ length: 33 }, () => {
+            const mesh = new inst.THREE.Mesh(new inst.THREE.SphereGeometry(0.02, 8, 8), mat.clone());
+            mesh.visible = false;
+            inst.scene.add(mesh);
+            return mesh;
+        });
+        inst.ghostBones = POSE_CONNECTIONS_33.map(([a, b]) => {
+            const geometry = new inst.THREE.BufferGeometry();
+            const positions = new Float32Array(6);
+            geometry.setAttribute('position', new inst.THREE.BufferAttribute(positions, 3));
+            const line = new inst.THREE.Line(geometry, new inst.THREE.LineBasicMaterial({ color: 0xff8cff, transparent: true, opacity: 0.4 }));
+            line.visible = false;
+            inst.scene.add(line);
+            return { a, b, line, positions };
+        });
+    }
+
+    const points = lms.map((p) => {
+        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) return null;
+        return { x: (p.x - 0.5) * 2, y: (0.5 - p.y) * 2, z: -(p.z || 0) * 2 };
+    });
+
+    inst.ghostJoints.forEach((mesh, idx) => {
+        const p = points[idx];
+        mesh.visible = Boolean(p);
+        if (p) mesh.position.set(p.x, p.y, p.z);
+    });
+    inst.ghostBones.forEach((b) => {
+        const pa = points[b.a], pb = points[b.b];
+        if (!pa || !pb) { b.line.visible = false; return; }
+        b.positions[0] = pa.x; b.positions[1] = pa.y; b.positions[2] = pa.z;
+        b.positions[3] = pb.x; b.positions[4] = pb.y; b.positions[5] = pb.z;
+        b.line.geometry.attributes.position.needsUpdate = true;
+        b.line.visible = true;
+    });
+}
+
+/** Elimina la geometría ghost del 3D. */
+function _removeCompareGhost() {
+    const inst = landmarksViewerState.three;
+    if (!inst) return;
+    if (inst.ghostJoints) {
+        inst.ghostJoints.forEach(m => { inst.scene.remove(m); m.geometry.dispose(); m.material.dispose(); });
+        inst.ghostJoints = null;
+    }
+    if (inst.ghostBones) {
+        inst.ghostBones.forEach(b => { inst.scene.remove(b.line); b.line.geometry.dispose(); b.line.material.dispose(); });
+        inst.ghostBones = null;
+    }
+}
+
+/** Mapea el frame actual del salto principal al frame correspondiente del salto de comparación, sincronizando por fase (proporcionalmente). */
+function _mapCompareFrame(idx) {
+    const main = landmarksViewerState.frames;
+    const comp = landmarksViewerState.compareFrames;
+    if (!comp || comp.length === 0 || main.length === 0) return null;
+    // Mapeo proporcional: misma fracción temporal
+    const ratio = idx / (main.length - 1);
+    const compIdx = Math.round(ratio * (comp.length - 1));
+    return comp[Math.max(0, Math.min(comp.length - 1, compIdx))];
+}
+
+/** Puebla el selector de comparación con los saltos guardados del usuario actual. */
+async function _poblarSelectorComparacion(idSaltoActual) {
+    const { compararWrap, selectComparar } = _landmarksUI();
+    if (!compararWrap || !selectComparar) return;
+
+    const idUsuario = document.getElementById('id-usuario-actual')?.value
+        || document.getElementById('select-usuario')?.value;
+    if (!idUsuario) { compararWrap.style.display = 'none'; return; }
+
+    try {
+        const resp = await fetch(`${getBackendBaseUrl()}/api/saltos/usuario/${idUsuario}`);
+        if (!resp.ok) { compararWrap.style.display = 'none'; return; }
+        const saltos = await resp.json();
+        if (!Array.isArray(saltos) || saltos.length < 2) { compararWrap.style.display = 'none'; return; }
+
+        selectComparar.innerHTML = '<option value="">— Ninguno —</option>';
+        saltos.forEach(s => {
+            const id = s.id_salto || s.id;
+            if (id === idSaltoActual) return;
+            const fecha = s.fecha_salto ? new Date(s.fecha_salto).toLocaleDateString() : '';
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = `#${id} — ${s.tipo_salto} ${s.distancia_cm || s.distancia || '?'} cm ${fecha}`;
+            selectComparar.appendChild(opt);
+        });
+        compararWrap.style.display = saltos.length > 1 ? 'flex' : 'none';
+    } catch {
+        compararWrap.style.display = 'none';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
 
 function _ocultarPanelLandmarks() {
     const { panel } = _landmarksUI();
     if (panel) {
         panel.style.display = 'none';
     }
+    _stopAnimation();
+    _removeCompareGhost();
     landmarksViewerState.idSalto = null;
     landmarksViewerState.frames = [];
     landmarksViewerState.currentFrame = 0;
+    landmarksViewerState.datos = null;
+    landmarksViewerState.compareFrames = null;
+    landmarksViewerState.compareIdSalto = null;
     _disposeThreeViewer();
 }
 
@@ -2866,6 +3343,7 @@ async function renderPanelLandmarksResultado(datos) {
 
         landmarksViewerState.frames = framesInline;
         landmarksViewerState.currentFrame = 0;
+        landmarksViewerState.datos = datos;
 
         if (ui.slider) {
             ui.slider.min = '0';
@@ -2876,6 +3354,10 @@ async function renderPanelLandmarksResultado(datos) {
         _bindLandmarksControls();
         _setLandmarksEstado('Landmarks cargados desde el analisis actual.');
         await _cambiarModoLandmarks(landmarksViewerState.mode || '2d');
+
+        if (Number.isFinite(idSaltoInline) && idSaltoInline > 0) {
+            _poblarSelectorComparacion(idSaltoInline);
+        }
         return;
     }
 

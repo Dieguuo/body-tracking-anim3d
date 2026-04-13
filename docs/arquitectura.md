@@ -25,6 +25,7 @@ Arduino (HC-SR04) → Serial USB (9600 baud) → Python MVC → Flask API → Fr
 ```
 Móvil (vídeo grabado) → Upload POST → MediaPipe PoseLandmarker → Cálculo híbrido (cinemática + calibración)
                                                                            │
+                                                              _detectar_factor_slowmo (corrección automática)
                                                               AterrizajeService (estabilidad + amortiguación)
                                                               CinematicoService (curvas + fases + velocidades)
                                                                            │
@@ -75,7 +76,7 @@ modules/salto/backend/
 │   ├── usuario_model.py         ← Queries tabla usuarios
 │   └── salto_model.py           ← Queries tabla saltos
 └── services/
-    ├── calculo_service.py       ← Fórmulas cinemáticas puras
+    ├── calculo_service.py       ← Fórmulas cinemáticas puras + detección slow-motion
     ├── biomecanica_service.py   ← Trigonometría pura para ángulos articulares
     ├── aterrizaje_service.py    ← Biomecánica del aterrizaje (estabilidad, amortiguación, simetría)
     ├── cinematico_service.py    ← Análisis cinemático temporal (curvas, fases, velocidades, resumen)
@@ -110,3 +111,97 @@ Relación 1:N con `ON DELETE CASCADE`: al eliminar un usuario se eliminan todos 
 - **Modularidad**: cada funcionalidad vive en `modules/<nombre>/` con arduino/mobile, backend y frontend propios.
 - **Autonomía de módulo**: cada módulo puede arrancarse y probarse de forma independiente.
 - **Puertos independientes**: cada módulo corre en su propio puerto (sensor → 5000, salto → 5001).
+
+## Visualización 3D — flujo de datos
+
+```
+Procesamiento de vídeo (MediaPipe PoseLandmarker)
+      │
+      │  Extrae 33 landmarks (x, y, z, visibility) por frame
+      ▼
+curvas_json (columna JSON en tabla saltos)
+      │
+      │  GET /api/salto/<id>/landmarks
+      ▼
+Frontend (api_salto.js)
+      │
+      ├──→ Canvas 2D (_dibujarFrame2D)         ← fallback / validación
+      │        Joints (círculos) + Bones (líneas)
+      │        Overlays: arcos de ángulo, trayectoria CM, color por fase
+      │        Ghost skeleton de comparación (35% opacidad, rosa)
+      │
+      └──→ Three.js 3D (_renderFrame3D)        ← visor principal
+               33 esferas + líneas en escena 3D
+               OrbitControls (rotar/zoom/pan)
+               Color dinámico de joints/bones por fase
+               Ghost skeleton 3D (40% opacidad, rosa)
+               Conversión coordenadas: MediaPipe → Three.js
+      │
+      ├──→ Animación (_startAnimation / _stopAnimation)
+      │        setInterval con intervalo basado en timestamps reales
+      │        Velocidad configurable: ×0.25, ×0.5, ×1
+      │        Loop automático al final
+      │
+      ├──→ Overlays (_actualizarMetricas)
+      │        Ángulos rodilla/cadera en tiempo real
+      │        Fase actual con nombre y color
+      │        Panel de métricas auto-visible
+      │
+      └──→ Comparación (_mapCompareFrame)
+               Carga landmarks de segundo salto (cached)
+               Mapeo proporcional de frames
+               Ghost skeleton sincronizado
+```
+
+### Carga de Three.js
+
+```
+CDN primario (esm.sh)  →  fallback (unpkg)  →  fallback (jsdelivr)  →  error → modo 2D
+```
+
+Three.js y OrbitControls se cargan una sola vez (patrón singleton con
+`threeDepsPromise`). Versión fijada: 0.160.0.
+
+### Tabla de componentes 3D
+
+| Componente | Archivo | Función |
+|---|---|---|
+| Extracción landmarks | `video_processor.py` | 33 puntos × N frames desde MediaPipe |
+| Persistencia | `salto_model.py` | Lectura/escritura en `curvas_json` |
+| API endpoint | `app.py` | `GET /api/salto/<id>/landmarks` |
+| Rendering 2D | `api_salto.js` | `_dibujarFrame2D()` sobre `<canvas>` |
+| Rendering 3D | `api_salto.js` | `_ensureThreeViewer()` + `_renderFrame3D()` |
+| Limpieza GPU | `api_salto.js` | `_disposeThreeViewer()` |
+| Conexiones | `api_salto.js` | `POSE_CONNECTIONS_33` (mapa de bones) |
+| Controles | `api_salto.js` | Toggle 2D/3D + slider + play/pause + speed |
+| Animación | `api_salto.js` | `_startAnimation()` + `_stopAnimation()` |
+| Fases | `api_salto.js` | `_getFaseParaFrame()` + `_FASE_COLORES` |
+| Overlays ángulos | `api_salto.js` | `_anguloEntreLandmarks()` + `_dibujarArcoAngulo2D()` |
+| Overlay trayectoria | `api_salto.js` | `_dibujarTrayectoriaCM2D()` |
+| Overlay fases | `api_salto.js` | `_getBoneColorForFase()` (2D y 3D) |
+| Métricas sync | `api_salto.js` | `_actualizarMetricas()` |
+| Comparación | `api_salto.js` | `_poblarSelectorComparacion()` + `_mapCompareFrame()` |
+| Ghost 2D | `api_salto.js` | `_dibujarFrameGhost2D()` |
+| Ghost 3D | `api_salto.js` | `_renderFrameGhost3D()` + `_removeCompareGhost()` |
+
+### Corrección de slow-motion — flujo
+
+```
+_detectar_vuelo()  →  ventana [despegue, aterrizaje] con fps_video (límites generosos: 5s/8s)
+      │
+_detectar_factor_slowmo(frames, despegue, aterrizaje, fps_video, altura_real_m)
+      │
+  1. Extrae Y de cadera durante vuelo
+  2. Ajusta parábola: y = a·t² + b·t + c  (np.polyfit)
+  3. Aceleración aparente: a_aparente = 2|a| × escala × fps²
+  4. Factor: sqrt(9.81 / g_aparente)
+  5. Si factor ∈ [0.7, 1.3] → no se corrige (velocidad normal)
+  6. Si factor > 1.3 → fps_real = fps_video × factor
+      │
+calcular_vertical() / calcular_horizontal()
+      │
+  tiempo_vuelo = (aterrizaje − despegue) / fps_real    ← corregido
+  velocidades, potencia, ratios → todos con fps_real
+      │
+ResultadoSalto.factor_slowmo → respuesta JSON
+```

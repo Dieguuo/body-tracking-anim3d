@@ -221,6 +221,8 @@ def calcular_salto():
             "clasificacion": clasificacion,
             # Fase 10 — Landmarks 33 puntos (opcional, evita payloads pesados por defecto)
             "landmarks_frames": resultado.landmarks_frames if incluir_landmarks else None,
+            # Slow-motion
+            "factor_slowmo": resultado.factor_slowmo,
         }
 
         # Guardar en BD si se proporcionó id_usuario
@@ -362,19 +364,31 @@ def video_anotado():
         if not exito:
             return jsonify({"error": "No se pudo generar el vídeo anotado"}), 500
 
-        return send_file(
-            ruta_salida,
+        # Leer el archivo en memoria para evitar PermissionError en Windows
+        # (send_file mantiene el archivo abierto durante el streaming y
+        # el bloque finally no puede borrarlo).
+        with open(ruta_salida, "rb") as f:
+            video_data = f.read()
+
+        response = app.response_class(
+            video_data,
             mimetype="video/mp4",
-            as_attachment=True,
-            download_name="salto_anotado.mp4",
+            headers={
+                "Content-Disposition": "attachment; filename=salto_anotado.mp4",
+                "Content-Length": str(len(video_data)),
+            },
         )
+        return response
     except Exception:
         logging.exception("Error generando vídeo anotado")
         return jsonify({"error": "Error interno al generar el vídeo anotado"}), 500
     finally:
         for ruta in [ruta_entrada, ruta_salida]:
-            if os.path.exists(ruta):
-                os.remove(ruta)
+            try:
+                if os.path.exists(ruta):
+                    os.remove(ruta)
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":
