@@ -481,7 +481,48 @@ cliente (`send_file` + limpieza en `finally`).
 
 ---
 
-## Decisiones de la visualización 3D interactiva (Fase 11)
+## Decisiones de robustez y UX para resultados no válidos
+
+## Guardia de interpretación para distancia 0
+
+Cuando `distancia <= 0` (no se detectó vuelo o desplazamiento válido),
+las funciones `generar_alertas_salto()`, `generar_observaciones()` y
+`clasificar_salto()` del servicio de interpretación podían devolver
+resultados engañosos (ej. "equilibrado" o "técnicamente correcto" con
+0 cm). Ahora `app.py` intercepta este caso antes de llamar a los
+servicios de interpretación: devuelve `clasificacion: "no_detectado"`,
+alertas vacías y una observación orientativa sobre requisitos del vídeo.
+
+En el frontend, `animarResultados()` detecta `distancia <= 0` y muestra
+"No detectado" en lugar de "0 cm", oculta los paneles técnicos
+(aterrizaje, gesto, timeline, curvas) y presenta un toast explicativo.
+Solo se mantiene visible el panel de observaciones/insights.
+
+## Auto-detección de tipo de salto (implementada pero no activada)
+
+Se implementó `detectar_tipo_salto()` en `CalculoService` que compara
+el desplazamiento Y vs X durante el vuelo para determinar si el
+movimiento es realmente vertical u horizontal, independientemente de
+lo que el usuario haya seleccionado. Heurística: si `delta_Y / delta_X > 5`,
+el salto es vertical.
+
+La función existe como utilidad pero **no se invoca automáticamente**
+en el flujo principal. Decisión: no cambiar silenciosamente el tipo
+que el usuario eligió. Si el vídeo muestra un salto vertical y el
+usuario pidió horizontal, el resultado será bajo pero correcto para
+lo que se midió. Es responsabilidad del usuario elegir el tipo adecuado.
+
+## Import json faltante en salto_model.py
+
+Los campos `curvas_angulares` y `estabilidad_aterrizaje` se serializan
+como JSON al guardar en BD y se deserializan al leer. El archivo usaba
+`json.dumps()` y `json.loads()` pero no importaba el módulo `json`,
+causando `NameError` en cualquier operación CRUD de saltos. Se añadió
+`import json` al encabezado del archivo.
+
+---
+
+## Decisiones de la visualización 3D interactiva (Fase 12)
 
 ## Persistencia de los 33 landmarks completos
 

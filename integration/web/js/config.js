@@ -21,6 +21,12 @@ function getCurrentProtocol() {
 }
 
 function getBackendBaseUrl() {
+    // Permitir override manual para tunnels (ngrok, devtunnels, etc.)
+    // Uso: en consola del navegador → localStorage.setItem('BACKEND_URL', 'https://xxx.devtunnels.ms')
+    const override = localStorage.getItem('BACKEND_URL');
+    if (override) {
+        return override.replace(/\/+$/, '');
+    }
     return `${getCurrentProtocol()}://${getCurrentHost()}:${BACKEND_SALTO_PORT}`;
 }
 

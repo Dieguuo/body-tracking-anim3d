@@ -29,6 +29,15 @@ let angulosDespegueActual = {
 };
 let asimetriaDespegueActual = null;
 
+// ── Tracking biomecánico durante el salto ──
+let angulosAterrizajeActual = { angulo_rodilla_deg: null, angulo_cadera_deg: null };
+let asimetriaAterrizajeActual = null;
+let minRodillaDuranteVuelo = null;   // Flexión máxima de rodilla en vuelo
+let minCaderaDuranteVuelo = null;    // Flexión máxima de cadera en vuelo
+let visibilidadAcumulada = 0;        // Suma de visibility de landmarks clave
+let framesConVisibilidad = 0;        // Nº de frames con landmarks detectados
+let yPostAterrizaje = [];            // Posiciones Y de pies post-aterrizaje para estabilidad
+
 let mediaRecorder = null;
 let chunksGrabacion = [];
 let stopRecorderResolver = null;
@@ -38,6 +47,10 @@ let toastTimer = null;
 let landmarksFramesLocalBuffer = [];
 let landmarksFrameSeq = 0;
 const MAX_LANDMARKS_LOCAL_FRAMES = 1500;
+
+// ── Suavizado EMA de landmarks (reduce jitter) ──
+const EMA_ALPHA = 0.4;          // 0 = muy suave, 1 = sin filtro
+let landmarksSuavizados = null;  // array de 33 {x,y,z,visibility}
 
 const SALTOS_OBJETIVO_COMPARATIVA = 4;
 let medidasComparativa = [];
@@ -208,6 +221,35 @@ function calcularEstabilidadLocal(asimetriaPct, confianza) {
     const penalizacionConf = Math.max(0, (1 - conf) * 35);
     const score = 100 - penalizacionAsim - penalizacionConf;
     return Number(Math.max(0, Math.min(100, score)).toFixed(2));
+}
+
+function calcularConfianzaDesdeVisibilidad(landmarks) {
+    // Landmarks clave para un salto: caderas, rodillas, tobillos, talones
+    const indices = [23, 24, 25, 26, 27, 28, 29, 30];
+    let suma = 0;
+    let count = 0;
+    for (const i of indices) {
+        const v = landmarks?.[i]?.visibility;
+        if (v !== undefined && v !== null) {
+            suma += v;
+            count++;
+        }
+    }
+    return count > 0 ? suma / count : 0.5;
+}
+
+function calcularEstabilidadPostAterrizaje(muestrasY) {
+    if (!muestrasY || muestrasY.length < 3) {
+        return null;
+    }
+    // Oscilación: desviación estándar de las posiciones Y post-aterrizaje
+    const media = muestrasY.reduce((a, b) => a + b, 0) / muestrasY.length;
+    const varianza = muestrasY.reduce((sum, y) => sum + Math.pow(y - media, 2), 0) / muestrasY.length;
+    const desviacion = Math.sqrt(varianza);
+    // Convertir oscilación a score 0-100 (menor oscilación = mayor estabilidad)
+    // En coords normalizadas, una oscilación de 0.02 es bastante inestable
+    const score = Math.max(0, 100 - (desviacion * 5000));
+    return Number(Math.min(100, score).toFixed(2));
 }
 
 function calcularAsimetriaDesdeLandmarks(landmarks) {
@@ -1556,11 +1598,13 @@ async function crearPoseLandmarker() {
         );
         poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
             baseOptions: {
-                modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+                modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
                 delegate: 'GPU'
             },
             runningMode: 'VIDEO',
-            numPoses: 1
+            numPoses: 1,
+            minPoseDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6
         });
 
         indicador.textContent = 'Motor Listo';
@@ -1603,7 +1647,21 @@ function renderLoop() {
 
         if (resultados.landmarks && resultados.landmarks.length > 0) {
             const drawingUtils = new DrawingUtils(canvasCtx);
-            const puntosCuerpo = resultados.landmarks[0];
+            const raw = resultados.landmarks[0];
+
+            // Suavizado EMA: reduce temblor manteniendo reactividad
+            if (!landmarksSuavizados) {
+                landmarksSuavizados = raw.map(p => ({ ...p }));
+            } else {
+                for (let i = 0; i < raw.length; i++) {
+                    landmarksSuavizados[i].x += EMA_ALPHA * (raw[i].x - landmarksSuavizados[i].x);
+                    landmarksSuavizados[i].y += EMA_ALPHA * (raw[i].y - landmarksSuavizados[i].y);
+                    landmarksSuavizados[i].z += EMA_ALPHA * (raw[i].z - landmarksSuavizados[i].z);
+                    landmarksSuavizados[i].visibility = raw[i].visibility;
+                }
+            }
+
+            const puntosCuerpo = landmarksSuavizados;
 
             registrarLandmarksLocales(puntosCuerpo);
 
@@ -1654,6 +1712,11 @@ function calcularFaseSalto(landmarks) {
     const yPieActual = (landmarks[27].y + landmarks[28].y) / 2;
     const xPieActual = (landmarks[27].x + landmarks[28].x) / 2;
 
+    // Acumular visibilidad para confianza real
+    const visFrame = calcularConfianzaDesdeVisibilidad(landmarks);
+    visibilidadAcumulada += visFrame;
+    framesConVisibilidad += 1;
+
     if (framesCalibracion < 30) {
         alturaBaseY += yPieActual;
         framesCalibracion += 1;
@@ -1682,24 +1745,54 @@ function calcularFaseSalto(landmarks) {
         yPicoVuelo = yPieActual;
         angulosDespegueActual = calcularAngulosDespegueDesdeLandmarks(landmarks);
         asimetriaDespegueActual = calcularAsimetriaDesdeLandmarks(landmarks);
+        // Reset tracking de vuelo
+        minRodillaDuranteVuelo = angulosDespegueActual.angulo_rodilla_deg;
+        minCaderaDuranteVuelo = angulosDespegueActual.angulo_cadera_deg;
+        yPostAterrizaje = [];
     } else if (estadoSalto === 'aire') {
         if (yPieActual < yPicoVuelo) {
             yPicoVuelo = yPieActual;
         }
 
+        // Trackear ángulos durante el vuelo (flexión máxima)
+        const angulosVuelo = calcularAngulosDespegueDesdeLandmarks(landmarks);
+        if (angulosVuelo.angulo_rodilla_deg !== null) {
+            if (minRodillaDuranteVuelo === null || angulosVuelo.angulo_rodilla_deg < minRodillaDuranteVuelo) {
+                minRodillaDuranteVuelo = angulosVuelo.angulo_rodilla_deg;
+            }
+        }
+        if (angulosVuelo.angulo_cadera_deg !== null) {
+            if (minCaderaDuranteVuelo === null || angulosVuelo.angulo_cadera_deg < minCaderaDuranteVuelo) {
+                minCaderaDuranteVuelo = angulosVuelo.angulo_cadera_deg;
+            }
+        }
+
         if (yPieActual > umbralDespegue) {
-            estadoSalto = 'suelo';
+            estadoSalto = 'aterrizaje_reciente';
+            angulosAterrizajeActual = calcularAngulosDespegueDesdeLandmarks(landmarks);
+            asimetriaAterrizajeActual = calcularAsimetriaDesdeLandmarks(landmarks);
+            yPostAterrizaje = [yPieActual];
+
             const tiempoAterrizaje = performance.now();
             const aterrizajeX = xPieActual;
 
             const tiempoVueloSegundos = (tiempoAterrizaje - tiempoDespegue) / 1000;
             if (tiempoVueloSegundos > 0.15) {
-                finalizarSaltoEnVivo(tiempoVueloSegundos, despegueX, aterrizajeX, posicionSueloNormal, yPicoVuelo)
-                    .catch((error) => {
-                        mostrarToast(`No se pudo guardar el salto: ${error.message}`, 'error', 3200);
-                    });
+                // Recoger muestras post-aterrizaje antes de finalizar
+                setTimeout(() => {
+                    estadoSalto = 'suelo';
+                    finalizarSaltoEnVivo(tiempoVueloSegundos, despegueX, aterrizajeX, posicionSueloNormal, yPicoVuelo)
+                        .catch((error) => {
+                            mostrarToast(`No se pudo guardar el salto: ${error.message}`, 'error', 3200);
+                        });
+                }, 500); // 500ms para recoger estabilidad post-aterrizaje
+            } else {
+                estadoSalto = 'suelo';
             }
         }
+    } else if (estadoSalto === 'aterrizaje_reciente') {
+        // Recoger muestras de estabilidad post-aterrizaje
+        yPostAterrizaje.push(yPieActual);
     }
 }
 
@@ -1831,10 +1924,23 @@ async function guardarResultadoEnBackend(datosLocales, guardarVideo, videoBlob) 
 
         const distanciaBackend = Number(payload.distancia || 0);
         if (distanciaBackend <= 0 && Number(datosLocales.distancia || 0) > 0) {
-            // Si backend devuelve 0 cm, mantenemos analisis avanzado y
-            // aplicamos distancia local calibrada para no romper UX.
-            mostrarToast('El backend devolvio 0 cm; se mantiene analisis avanzado y se muestra distancia local calibrada.', 'warn', 3200);
-            return combinarResultadoConFallback(payload, datosLocales);
+            mostrarToast('El backend devolvió 0 cm; se aplica la distancia local calibrada.', 'warn', 3200);
+            const fallbackLocal = await guardarLocalEnSaltos();
+            return {
+                ...payload,
+                ...fallbackLocal,
+                potencia_w: potenciaPayload ?? potenciaLocal,
+                asimetria_pct: asimetriaPayload ?? asimetriaLocal,
+                estabilidad_aterrizaje: estabilidadPayload ?? estabilidadLocal,
+                angulo_rodilla_deg: normalizarNumeroOpcional(payload.angulo_rodilla_deg) ?? datosLocales.angulo_rodilla_deg ?? null,
+                angulo_cadera_deg: normalizarNumeroOpcional(payload.angulo_cadera_deg) ?? datosLocales.angulo_cadera_deg ?? null,
+                // Sobreescribir interpretación del backend (que dice "no_detectado")
+                // porque la detección local SÍ midió un salto válido.
+                observaciones: ["Salto medido en tiempo real. El vídeo grabado no pudo ser reprocesado por el backend."],
+                alertas: payload.alertas && payload.alertas.length > 0 && payload.clasificacion !== 'no_detectado'
+                    ? payload.alertas : [],
+                clasificacion: 'medido_en_vivo',
+            };
         }
 
         return combinarResultadoConFallback(payload, datosLocales);
@@ -1878,15 +1984,30 @@ async function finalizarSaltoEnVivo(tiempoVuelo, startX, endX, ySuelo, yPico) {
         distancia: distanciaFinalCm,
         unidad: 'cm',
         tipo_salto: textoTipo,
-        confianza: 0.95,
+        confianza: framesConVisibilidad > 0
+            ? Number((visibilidadAcumulada / framesConVisibilidad).toFixed(3))
+            : 0.5,
         tiempo_vuelo_s: Number(tiempoVuelo.toFixed(3)),
         frame_despegue: 'Directo',
         frame_aterrizaje: 'Directo',
+        // Ángulos de despegue
         angulo_rodilla_deg: normalizarNumeroOpcional(angulosDespegueActual.angulo_rodilla_deg),
         angulo_cadera_deg: normalizarNumeroOpcional(angulosDespegueActual.angulo_cadera_deg),
+        // Ángulos de aterrizaje
+        angulo_rodilla_aterrizaje_deg: normalizarNumeroOpcional(angulosAterrizajeActual.angulo_rodilla_deg),
+        angulo_cadera_aterrizaje_deg: normalizarNumeroOpcional(angulosAterrizajeActual.angulo_cadera_deg),
+        // Flexión máxima durante vuelo
+        flexion_rodilla_max_deg: normalizarNumeroOpcional(minRodillaDuranteVuelo),
+        flexion_cadera_max_deg: normalizarNumeroOpcional(minCaderaDuranteVuelo),
         potencia_w: calcularPotenciaLocal(textoTipo, distanciaFinalCm, tiempoVuelo),
-        asimetria_pct: normalizarNumeroOpcional(asimetriaDespegueActual),
-        estabilidad_aterrizaje: calcularEstabilidadLocal(asimetriaDespegueActual, 0.95),
+        // Asimetría: preferir la del aterrizaje si existe, sino la de despegue
+        asimetria_pct: normalizarNumeroOpcional(asimetriaAterrizajeActual) ?? normalizarNumeroOpcional(asimetriaDespegueActual),
+        // Estabilidad real basada en oscilación post-aterrizaje
+        estabilidad_aterrizaje: calcularEstabilidadPostAterrizaje(yPostAterrizaje)
+            ?? calcularEstabilidadLocal(
+                normalizarNumeroOpcional(asimetriaAterrizajeActual) ?? normalizarNumeroOpcional(asimetriaDespegueActual),
+                framesConVisibilidad > 0 ? visibilidadAcumulada / framesConVisibilidad : 0.5
+            ),
         landmarks_frames: landmarksFramesLocalBuffer.slice()
     };
 
@@ -1963,11 +2084,19 @@ document.addEventListener('iniciarDeteccion', () => {
     framesCalibracion = 0;
     alturaBaseY = 0;
     yPicoVuelo = 1.0;
+    landmarksSuavizados = null;  // Reset suavizado para nueva sesión
     angulosDespegueActual = {
         angulo_rodilla_deg: null,
         angulo_cadera_deg: null
     };
     asimetriaDespegueActual = null;
+    angulosAterrizajeActual = { angulo_rodilla_deg: null, angulo_cadera_deg: null };
+    asimetriaAterrizajeActual = null;
+    minRodillaDuranteVuelo = null;
+    minCaderaDuranteVuelo = null;
+    visibilidadAcumulada = 0;
+    framesConVisibilidad = 0;
+    yPostAterrizaje = [];
     finalizandoSalto = false;
     landmarksFramesLocalBuffer = [];
     landmarksFrameSeq = 0;
@@ -2040,6 +2169,35 @@ function animarResultados(datos) {
     if (resumen) {
         resumen.style.display = 'none';
     }
+
+    // Si no se detectó salto válido (distancia 0), mostrar mensaje claro
+    const distancia = Number(datos.distancia || 0);
+    if (distancia <= 0) {
+        document.getElementById('distancia-resultado').textContent = 'No detectado';
+        document.getElementById('tipo-resultado').textContent = `Salto ${normalizarTextoTipo(datos.tipo_salto)}`;
+
+        if (gridTecnico) {
+            gridTecnico.style.display = 'none';
+        }
+
+        // Ocultar paneles técnicos que no tienen sentido sin salto
+        const panelAterrizaje = document.getElementById('panel-aterrizaje');
+        if (panelAterrizaje) panelAterrizaje.style.display = 'none';
+        const panelGesto = document.getElementById('panel-resumen-gesto');
+        if (panelGesto) panelGesto.style.display = 'none';
+        const panelTimeline = document.getElementById('panel-timeline');
+        if (panelTimeline) panelTimeline.style.display = 'none';
+        const panelCurvas = document.getElementById('panel-curvas');
+        if (panelCurvas) panelCurvas.style.display = 'none';
+
+        // Mostrar solo las observaciones del backend (que ahora incluyen el motivo)
+        renderInsightsSalto(datos);
+
+        mostrarToast('No se detectó un salto válido. Usa un vídeo con cuerpo completo, cámara fija y vista lateral.', 'warn', 5000);
+        panelResultados.classList.add('show');
+        return;
+    }
+
     if (gridTecnico) {
         gridTecnico.style.display = 'grid';
     }
@@ -2109,6 +2267,14 @@ function animarResultados(datos) {
     renderPanelLandmarksResultado(datos).catch((error) => {
         console.warn('No se pudo renderizar el panel de landmarks:', error);
     });
+
+    // Fase 12 — Indicador de slow-motion
+    if (datos.slowmo_factor && datos.slowmo_factor > 1.3) {
+        mostrarToast(
+            `Slow-motion detectado (×${datos.slowmo_factor.toFixed(1)}). Tiempo de vuelo corregido automáticamente.`,
+            'info', 4500
+        );
+    }
 
     panelResultados.classList.add('show');
 }
