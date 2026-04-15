@@ -17,6 +17,7 @@ from mysql.connector import IntegrityError
 from models.salto_model import SaltoModel
 from models.usuario_model import UsuarioModel
 from services.video_library_service import clasificar_videos
+from utils.serializers import serializar_row as _serializar, extraer_campos_float_salto
 
 saltos_bp = Blueprint("saltos_db", __name__)
 
@@ -25,29 +26,6 @@ _usuario_model = UsuarioModel()
 
 TIPOS_SALTO_VALIDOS = {"vertical", "horizontal"}
 METODOS_VALIDOS = {"ia_vivo", "video_galeria", "sensor_arduino"}
-
-
-def _serializar(row: dict) -> dict:
-    """Convierte Decimal/datetime a tipos serializables JSON."""
-    out = {}
-    for k, v in row.items():
-        if hasattr(v, "isoformat"):
-            out[k] = v.isoformat()
-        elif hasattr(v, "__float__"):
-            out[k] = float(v)
-        else:
-            out[k] = v
-    return out
-
-
-def _float_optional(data: dict, key: str) -> float | None:
-    value = data.get(key)
-    if value is None or value == "":
-        return None
-    try:
-        return float(value)
-    except (ValueError, TypeError):
-        raise ValueError(key)
 
 
 def _parse_range_header(range_header: str, total_size: int) -> tuple[int, int] | None:
@@ -117,17 +95,11 @@ def crear():
 
     # Campos opcionales
     try:
-        tiempo_vuelo_s = _float_optional(data, "tiempo_vuelo_s")
-        confianza_ia = _float_optional(data, "confianza_ia")
-        potencia_w = _float_optional(data, "potencia_w")
-        asimetria_pct = _float_optional(data, "asimetria_pct")
-        angulo_rodilla_deg = _float_optional(data, "angulo_rodilla_deg")
-        angulo_cadera_deg = _float_optional(data, "angulo_cadera_deg")
-        estabilidad_aterrizaje = _float_optional(data, "estabilidad_aterrizaje")
+        campos = extraer_campos_float_salto(data)
     except ValueError as exc:
         return jsonify({"error": f"{str(exc)} debe ser numérico"}), 400
 
-    if confianza_ia is not None and not (0 <= confianza_ia <= 1):
+    if campos["confianza_ia"] is not None and not (0 <= campos["confianza_ia"] <= 1):
         return jsonify({"error": "confianza_ia debe ser un número entre 0 y 1"}), 400
 
     # Verificar que el usuario existe
@@ -137,12 +109,12 @@ def crear():
     try:
         nuevo_id = _salto_model.crear(
             id_usuario, tipo_salto, distancia_cm,
-            tiempo_vuelo_s, confianza_ia, metodo_origen,
-            potencia_w=potencia_w,
-            asimetria_pct=asimetria_pct,
-            angulo_rodilla_deg=angulo_rodilla_deg,
-            angulo_cadera_deg=angulo_cadera_deg,
-            estabilidad_aterrizaje=estabilidad_aterrizaje,
+            campos["tiempo_vuelo_s"], campos["confianza_ia"], metodo_origen,
+            potencia_w=campos["potencia_w"],
+            asimetria_pct=campos["asimetria_pct"],
+            angulo_rodilla_deg=campos["angulo_rodilla_deg"],
+            angulo_cadera_deg=campos["angulo_cadera_deg"],
+            estabilidad_aterrizaje=campos["estabilidad_aterrizaje"],
         )
     except IntegrityError:
         return jsonify({"error": "Error de integridad: el usuario indicado no existe o hay un conflicto de datos"}), 409
@@ -206,27 +178,21 @@ def actualizar(id_salto):
         return jsonify({"error": "distancia_cm debe ser un entero >= 0"}), 400
 
     try:
-        tiempo_vuelo_s = _float_optional(data, "tiempo_vuelo_s")
-        confianza_ia = _float_optional(data, "confianza_ia")
-        potencia_w = _float_optional(data, "potencia_w")
-        asimetria_pct = _float_optional(data, "asimetria_pct")
-        angulo_rodilla_deg = _float_optional(data, "angulo_rodilla_deg")
-        angulo_cadera_deg = _float_optional(data, "angulo_cadera_deg")
-        estabilidad_aterrizaje = _float_optional(data, "estabilidad_aterrizaje")
+        campos = extraer_campos_float_salto(data)
     except ValueError as exc:
         return jsonify({"error": f"{str(exc)} debe ser numérico"}), 400
 
-    if confianza_ia is not None and not (0 <= confianza_ia <= 1):
+    if campos["confianza_ia"] is not None and not (0 <= campos["confianza_ia"] <= 1):
         return jsonify({"error": "confianza_ia debe ser un número entre 0 y 1"}), 400
 
     ok = _salto_model.actualizar(
         id_salto, tipo_salto, distancia_cm,
-        tiempo_vuelo_s, confianza_ia, metodo_origen,
-        potencia_w=potencia_w,
-        asimetria_pct=asimetria_pct,
-        angulo_rodilla_deg=angulo_rodilla_deg,
-        angulo_cadera_deg=angulo_cadera_deg,
-        estabilidad_aterrizaje=estabilidad_aterrizaje,
+        campos["tiempo_vuelo_s"], campos["confianza_ia"], metodo_origen,
+        potencia_w=campos["potencia_w"],
+        asimetria_pct=campos["asimetria_pct"],
+        angulo_rodilla_deg=campos["angulo_rodilla_deg"],
+        angulo_cadera_deg=campos["angulo_cadera_deg"],
+        estabilidad_aterrizaje=campos["estabilidad_aterrizaje"],
     )
     if not ok:
         return jsonify({"error": "Salto no encontrado"}), 404

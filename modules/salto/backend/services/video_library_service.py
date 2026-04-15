@@ -10,19 +10,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-VENTANA_SESION_HORAS = 2
+from utils.session_utils import to_datetime as _to_datetime, agrupar_sesiones, VENTANA_SESION_HORAS
+
 TAMANO_GRUPO_COMPARATIVA = 4
-
-
-def _to_datetime(value) -> datetime | None:
-    if isinstance(value, datetime):
-        return value
-    if isinstance(value, str):
-        try:
-            return datetime.fromisoformat(value)
-        except ValueError:
-            return None
-    return None
 
 
 def _serializar_video(video: dict) -> dict:
@@ -43,36 +33,7 @@ def _serializar_video(video: dict) -> dict:
 
 
 def _agrupar_sesiones(videos_asc: list[dict]) -> list[list[dict]]:
-    if not videos_asc:
-        return []
-
-    sesiones: list[list[dict]] = []
-    actual: list[dict] = []
-    ultimo_dt: datetime | None = None
-    margen = timedelta(hours=VENTANA_SESION_HORAS)
-
-    for video in videos_asc:
-        dt = _to_datetime(video.get("fecha_salto"))
-        if dt is None:
-            continue
-
-        if not actual:
-            actual = [video]
-            ultimo_dt = dt
-            continue
-
-        if ultimo_dt is not None and (dt - ultimo_dt) <= margen:
-            actual.append(video)
-        else:
-            sesiones.append(actual)
-            actual = [video]
-
-        ultimo_dt = dt
-
-    if actual:
-        sesiones.append(actual)
-
-    return sesiones
+    return agrupar_sesiones(videos_asc, campo_fecha="fecha_salto")
 
 
 def clasificar_videos(videos: list[dict]) -> dict:

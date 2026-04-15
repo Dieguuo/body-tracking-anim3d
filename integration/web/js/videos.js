@@ -15,30 +15,7 @@ function formatearFecha(fechaIso) {
     });
 }
 
-async function fetchJson(url, options = {}) {
-    let respuesta;
-    try {
-        respuesta = await fetch(url, options);
-    } catch (_error) {
-        throw new Error(`No hay conexión con el backend (${getBackendBaseUrl()}).`);
-    }
-
-    const raw = await respuesta.text();
-    let payload = {};
-    if (raw) {
-        try {
-            payload = JSON.parse(raw);
-        } catch (_e) {
-            payload = {};
-        }
-    }
-
-    if (!respuesta.ok) {
-        throw new Error(payload.error || `Error HTTP: ${respuesta.status}`);
-    }
-
-    return payload;
-}
+// fetchJson() se carga desde js/api-client.js
 
 function crearControlesVideo(videoEl) {
     const controles = document.createElement('div');

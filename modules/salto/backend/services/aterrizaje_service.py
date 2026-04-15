@@ -19,6 +19,9 @@ class AterrizajeService:
     # Umbral de derivada Y (px/frame) para considerar que el CM se ha estabilizado
     UMBRAL_ESTABILIZADO = 0.5
 
+    # Rango mínimo (grados) de flexión de rodilla para considerar buena amortiguación
+    UMBRAL_RIGIDEZ_DEG = 20
+
     @classmethod
     def analizar_estabilidad(
         cls,
@@ -157,7 +160,7 @@ class AterrizajeService:
             "angulo_rodilla_aterrizaje_deg": round(angulo_aterrizaje, 2),
             "flexion_maxima_deg": round(flexion_maxima, 2),
             "rango_amortiguacion_deg": round(rango, 2),
-            "alerta_rigidez": rango < 20,
+            "alerta_rigidez": rango < cls.UMBRAL_RIGIDEZ_DEG,
         }
 
     @classmethod

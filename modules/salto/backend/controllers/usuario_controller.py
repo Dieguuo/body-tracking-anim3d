@@ -50,17 +50,7 @@ def _leer_tipo_salto(default: str = "vertical"):
     return tipo, None, None
 
 
-def _serializar(row: dict) -> dict:
-    """Convierte Decimal/datetime a tipos serializables JSON."""
-    out = {}
-    for k, v in row.items():
-        if hasattr(v, "isoformat"):
-            out[k] = v.isoformat()
-        elif hasattr(v, "__float__"):
-            out[k] = float(v)
-        else:
-            out[k] = v
-    return out
+from utils.serializers import serializar_row as _serializar
 
 
 @usuarios_bp.route("/api/usuarios", methods=["GET"])

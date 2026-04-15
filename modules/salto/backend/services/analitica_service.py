@@ -15,24 +15,12 @@ from collections import defaultdict
 import numpy as np
 
 from services.biomecanica_service import BiomecanicaService
+from utils.session_utils import to_datetime as _to_datetime, agrupar_sesiones, VENTANA_SESION_HORAS
 
 TIPOS_SALTO_VALIDOS = {"vertical", "horizontal"}
-VENTANA_SESION_HORAS = 2
 CAIDA_SIGNIFICATIVA_PCT = 10.0
 UMBRAL_ESTANCADO_CM_SEMANA = 0.5
 UMBRAL_CAIDA_FATIGA_PCT = 10.0
-
-
-def _to_datetime(value) -> datetime | None:
-    """Convierte diferentes representaciones de fecha a datetime."""
-    if isinstance(value, datetime):
-        return value
-    if isinstance(value, str):
-        try:
-            return datetime.fromisoformat(value)
-        except ValueError:
-            return None
-    return None
 
 
 def _regresion_lineal(xs: list[float], ys: list[float]) -> tuple[float, float, float]:
@@ -78,36 +66,7 @@ def _agrupar_sesiones(saltos_ordenados: list[dict]) -> list[list[dict]]:
     Agrupa saltos por sesión usando una separación máxima de 2 horas
     entre saltos consecutivos.
     """
-    if not saltos_ordenados:
-        return []
-
-    sesiones: list[list[dict]] = []
-    actual: list[dict] = []
-    ultimo_dt: datetime | None = None
-    margen = timedelta(hours=VENTANA_SESION_HORAS)
-
-    for salto in saltos_ordenados:
-        dt = _to_datetime(salto.get("fecha_salto"))
-        if dt is None:
-            continue
-
-        if not actual:
-            actual = [salto]
-            ultimo_dt = dt
-            continue
-
-        if ultimo_dt is not None and (dt - ultimo_dt) <= margen:
-            actual.append(salto)
-        else:
-            sesiones.append(actual)
-            actual = [salto]
-
-        ultimo_dt = dt
-
-    if actual:
-        sesiones.append(actual)
-
-    return sesiones
+    return agrupar_sesiones(saltos_ordenados, campo_fecha="fecha_salto")
 
 
 def calcular_fatiga_intra_sesion(saltos_ordenados: list[dict]) -> dict:

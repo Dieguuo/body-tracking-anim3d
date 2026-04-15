@@ -11,6 +11,15 @@ from config import GRAVEDAD, UMBRAL_DERIVADA_Y
 from models.video_processor import FramePies
 from services.biomecanica_service import BiomecanicaService
 
+# ── Pesos para combinación híbrida de métodos (vertical) ──
+PESO_PIXELES = 0.6
+PESO_CINEMATICA = 0.4
+# Ratio máximo entre los dos métodos para considerarlos coherentes
+RATIO_COHERENCIA_MAX = 1.8
+# Pesos para el cálculo de confianza
+PESO_COBERTURA_CONFIANZA = 0.65
+PESO_PROFUNDIDAD_CONFIANZA = 0.35
+
 
 @dataclass
 class ResultadoSalto:
@@ -116,8 +125,8 @@ class CalculoService:
             menor = min(altura_px_valida, altura_cin_valida)
             ratio = (mayor / menor) if menor > 0 else 99.0
 
-            if ratio <= 1.8:
-                distancia_final = (0.6 * altura_px_valida) + (0.4 * altura_cin_valida)
+            if ratio <= RATIO_COHERENCIA_MAX:
+                distancia_final = (PESO_PIXELES * altura_px_valida) + (PESO_CINEMATICA * altura_cin_valida)
                 metodo = "hibrido"
             else:
                 # Si discrepan mucho, priorizar la estimación más alta para evitar colapso por ruido.
@@ -362,7 +371,7 @@ class CalculoService:
         cobertura = detectados / len(frames_vuelo) if frames_vuelo else 0.0
         profundidad_px = float(y_base - np.min(y_suave[despegue:aterrizaje + 1]))
         factor_profundidad = min(1.0, profundidad_px / max(umbral_altura * 1.8, 1.0))
-        confianza = max(0.0, min(1.0, (0.65 * cobertura) + (0.35 * factor_profundidad)))
+        confianza = max(0.0, min(1.0, (PESO_COBERTURA_CONFIANZA * cobertura) + (PESO_PROFUNDIDAD_CONFIANZA * factor_profundidad)))
 
         return despegue, aterrizaje, confianza
 
