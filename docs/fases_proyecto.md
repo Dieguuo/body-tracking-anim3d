@@ -258,7 +258,37 @@ Objetivo: extraer patrones y relaciones entre variables que no son evidentes a s
 
 ---
 
-## Fase 11 — Visualización 3D interactiva
+## Fase 11 — Robustez, corrección de bugs y mejoras UX (completada)
+
+Objetivo: corregir bugs detectados en pruebas manuales y mejorar la coherencia de los resultados cuando el análisis no puede producir datos válidos.
+
+### 11.1 Bug fix: import json en salto_model.py
+
+- [x] Detectado `NameError` por `json.dumps()` / `json.loads()` sin `import json`
+- [x] Añadido `import json` al encabezado de `models/salto_model.py`
+- [x] Afectaba a cualquier operación CRUD de saltos (guardar/leer campos JSON)
+
+### 11.2 Resolución de conflicto Git en api_salto.js
+
+- [x] Archivo `integration/web/js/api_salto.js` en estado `UU` (unmerged)
+- [x] Conflicto resuelto y archivo añadido al staging (`git add`)
+
+### 11.3 UX coherente para distancia 0 cm
+
+- [x] Backend (`app.py`): guardia antes de la interpretación — si `distancia <= 0`, devolver `clasificacion: "no_detectado"`, alertas vacías y observación orientativa
+- [x] Frontend (`api_salto.js`): `animarResultados()` detecta `distancia <= 0` y muestra "No detectado" en vez de "0 cm"
+- [x] Ocultar paneles técnicos sin sentido (aterrizaje, gesto, timeline, curvas) cuando no hay salto detectado
+- [x] Toast informativo al usuario con requisitos del vídeo
+
+### 11.4 Utilidad de auto-detección de tipo de salto
+
+- [x] Implementado `detectar_tipo_salto()` en `CalculoService` — compara delta Y vs delta X del vuelo
+- [x] Heurística: si `delta_Y / delta_X > 5`, el salto es vertical independientemente de lo seleccionado
+- [x] Decisión: función disponible como utilidad pero **no se activa automáticamente** — el usuario elige el tipo
+
+---
+
+## Fase 12 — Visualización 3D interactiva
 
 Prerequisito: Fases 7–8 completadas (curvas cinemáticas + timeline funcional).
 
