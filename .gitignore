@@ -18,6 +18,9 @@ build/
 # Carpetas de uploads (archivos temporales de usuario)
 uploads/
 
+# Certificados locales
+certs/
+
 # OS
 Thumbs.db
 Desktop.ini

@@ -44,11 +44,14 @@ mysql -u root -p < scripts\init_db.sql
 
 ## 2. Arrancar la aplicación
 
-### Opción rápida
+### Opción rápida (recomendada)
 
-Doble clic en **`scripts\run_all.bat`**. Se abrirán tres ventanas de terminal automáticamente.
+Doble clic en **`scripts\run_all.bat`**. Se abrirán tres ventanas de terminal automáticamente.  
+El frontend arranca en **HTTPS** en el puerto **8443**. Abrir: **https://localhost:8443**
 
-### Opción manual
+> **Nota:** si es la primera vez, el navegador mostrará un aviso de certificado autofirmado. Pulsar "Avanzado" → "Continuar" para aceptarlo.
+
+### Opción manual — HTTPS (recomendada)
 
 Abrir tres terminales y ejecutar en cada una:
 
@@ -56,9 +59,29 @@ Abrir tres terminales y ejecutar en cada una:
 |----------|---------|--------|
 | Backend Salto | `cd modules\salto\backend` → `python app.py` | 5001 |
 | Backend Sensor | `cd modules\sensor\backend` → `python app.py` | 5000 |
-| Frontend Web | `cd integration\web` → `python -m http.server 8080` | 8080 |
+| Frontend Web (HTTPS) | `python scripts\https_server.py` | 8443 |
+
+Si aún no tienes certificados, genéralos primero:
+
+```powershell
+python scripts\generate_cert.py
+```
+
+Una vez arrancado, abrir en el navegador: **https://localhost:8443**
+
+### Opción manual — HTTP (sin cámara en móvil)
+
+Si no necesitas HTTPS (solo consultar datos, sin usar cámara desde móvil):
+
+| Terminal | Comando | Puerto |
+|----------|---------|--------|
+| Backend Salto | `cd modules\salto\backend` → `python app.py` | 5001 |
+| Backend Sensor | `cd modules\sensor\backend` → `python app.py` | 5000 |
+| Frontend Web (HTTP) | `cd integration\web` → `python -m http.server 8080` | 8080 |
 
 Una vez arrancado, abrir en el navegador: **http://localhost:8080**
+
+> **Importante:** el acceso por HTTP no permite usar la cámara desde el móvil (los navegadores exigen HTTPS). Para grabar saltos desde el móvil usa la opción HTTPS.
 
 ---
 
@@ -239,8 +262,23 @@ Si quieres grabar un salto con la cámara del móvil:
    ipconfig
    ```
    Busca la dirección IPv4 (ej: `192.168.1.42`).
-3. En el móvil, abre el navegador y escribe: `http://192.168.1.42:8080`
-4. Si la cámara no se activa, puede ser porque el navegador exige HTTPS. Solución rápida en Chrome Android:
+
+### Opción A — HTTPS (recomendada)
+
+3. Genera el certificado incluyendo la IP LAN (se hace automáticamente):
+   ```powershell
+   python scripts\generate_cert.py
+   ```
+4. Arranca el frontend HTTPS: `python scripts\https_server.py`
+5. En el móvil, abre el navegador y escribe: `https://192.168.1.42:8443`
+6. Acepta el aviso de certificado autofirmado ("Avanzado" → "Continuar").
+7. La cámara funcionará directamente porque el navegador detecta HTTPS.
+
+### Opción B — HTTP (sin HTTPS)
+
+3. Arranca el frontend HTTP: `cd integration\web` → `python -m http.server 8080`
+4. En el móvil, abre el navegador y escribe: `http://192.168.1.42:8080`
+5. Si la cámara no se activa, es porque el navegador exige HTTPS. Solución en Chrome Android:
    - Ir a `chrome://flags`
    - Buscar **"Insecure origins treated as secure"**
    - Añadir `http://192.168.1.42:8080`
@@ -254,7 +292,7 @@ Si quieres grabar un salto con la cámara del móvil:
 |----------|---------------|----------|
 | "Error al conectar con localhost:5001" | Backend de salto no está arrancado | Ejecutar `python app.py` en `modules/salto/backend` |
 | "Error al conectar con localhost:5000" | Backend del sensor no está arrancado | Ejecutar `python app.py` en `modules/sensor/backend` |
-| La cámara no se activa | No se dieron permisos / no hay HTTPS | Aceptar permisos del navegador. Desde móvil, ver sección 6 |
+| La cámara no se activa | No se dieron permisos / no hay HTTPS | Aceptar permisos del navegador. Desde móvil, usar HTTPS (ver sección 6, opción A) |
 | "Introduce una altura válida" | Campo de altura vacío o con valor ≤ 0 | Escribir la estatura en metros (ej: 1.75) |
 | "Extensión no permitida" | Formato de vídeo no soportado | Usar .mp4, .webm, .avi o .mov |
 | Badge rojo en sensor | Arduino no conectado o backend caído | Verificar USB + que el backend esté corriendo |

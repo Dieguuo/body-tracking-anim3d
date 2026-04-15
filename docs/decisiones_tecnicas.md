@@ -199,8 +199,10 @@ sin acoplar las rutas al punto de entrada principal.
 
 MySQL Connector devuelve columnas `DECIMAL` como `decimal.Decimal` y  
 columnas `DATETIME` como `datetime.datetime`, que no son serializables  
-por `json.dumps`. La función `_serializar()` en cada controller convierte  
-`Decimal` a `float` y `datetime` a cadena ISO 8601 antes de devolver JSON.
+por `json.dumps`. La función `serializar_row()` en `utils/serializers.py`  
+convierte `Decimal` a `float` y `datetime` a cadena ISO 8601 antes de  
+devolver JSON. Los controllers la importan como alias local:  
+`from utils.serializers import serializar_row as _serializar`.
 
 ## Guardado automático en BD desde el endpoint de cálculo
 

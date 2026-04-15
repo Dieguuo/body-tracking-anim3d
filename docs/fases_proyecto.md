@@ -300,7 +300,7 @@ Prerequisito: Fases 7–8 completadas (curvas cinemáticas + timeline funcional)
 - [x] Intervalo de animación calculado a partir de timestamps reales de los frames y velocidad seleccionada
 - [x] Indicador de fase actual (preparación → impulsión → vuelo → recepción) sincronizado con la animación (`#landmarks-fase-actual`)
 - [x] Helper `_getFaseParaFrame()` que busca la fase correspondiente a un frame en `datos.fases_salto`
-- [x] Esquema de colores por fase: azul (preparación), amarillo (impulsión), verde (vuelo), rojo (recepción)
+- [x] Esquema de colores por fase en el visor 3D/landmarks: azul (preparación), amarillo (impulsión), verde (vuelo), rojo (recepción). _Nota: el timeline del panel de resultados usa una paleta diferente (violeta, cian, verde, naranja)._
 - [x] Loop automático: al llegar al último frame, vuelve al primero
 
 ### 11.5 Overlays biomecánicos en 2D y 3D (completada)

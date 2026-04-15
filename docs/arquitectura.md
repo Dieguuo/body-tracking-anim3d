@@ -53,7 +53,8 @@ modules/
 └── salto/           ← Módulo 2: backend/ (MVC + MediaPipe) + mobile/ (futuro)
 
 integration/web/     ← Frontend web unificado (index + salto + sensor)
-scripts/             ← run_all.bat para arrancar todo
+  js/api-client.js   ← Utilidad compartida fetchJson() para todas las páginas
+scripts/             ← run_all.bat + https_server.py + generate_cert.py
 ```
 
 El frontend unificado en `integration/web/` consume ambos backends.
@@ -75,6 +76,9 @@ modules/salto/backend/
 │   ├── video_processor.py       ← MediaPipe PoseLandmarker — extrae landmarks por frame
 │   ├── usuario_model.py         ← Queries tabla usuarios
 │   └── salto_model.py           ← Queries tabla saltos
+├── utils/
+│   ├── serializers.py           ← Serialización JSON compartida (Decimal/datetime → JSON)
+│   └── session_utils.py         ← Agrupación de sesiones + conversión de fechas
 └── services/
     ├── calculo_service.py       ← Fórmulas cinemáticas puras + detección slow-motion
     ├── biomecanica_service.py   ← Trigonometría pura para ángulos articulares
@@ -82,7 +86,9 @@ modules/salto/backend/
     ├── cinematico_service.py    ← Análisis cinemático temporal (curvas, fases, velocidades, resumen)
     ├── video_anotado_service.py ← Generación de vídeo con overlay OpenCV
     ├── analitica_service.py     ← Fatiga intra-sesión + tendencia histórica
-    └── comparativa_service.py   ← Lógica de negocio: progreso (mín. 4+4) y comparativa
+    ├── comparativa_service.py   ← Lógica de negocio: progreso (mín. 4+4) y comparativa
+    ├── interpretacion_service.py ← Alertas biomecánicas, observaciones y clasificación (Fase 9)
+    └── video_library_service.py ← Clasificación de vídeos individuales y comparativas (Fase 8.4)
 ```
 
 ### Base de datos — `bd_anim3d_saltos`
