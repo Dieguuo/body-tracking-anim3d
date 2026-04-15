@@ -6,3 +6,4 @@ opencv-python
 numpy
 mysql-connector-python
 python-dotenv
+cryptography

@@ -12,10 +12,18 @@ function getCurrentHost() {
     return host || 'localhost';
 }
 
+function getCurrentProtocol() {
+    const proto = String(window.location.protocol || '').toLowerCase();
+    if (proto === 'https:') {
+        return 'https';
+    }
+    return 'http';
+}
+
 function getBackendBaseUrl() {
-    return `http://${getCurrentHost()}:${BACKEND_SALTO_PORT}`;
+    return `${getCurrentProtocol()}://${getCurrentHost()}:${BACKEND_SALTO_PORT}`;
 }
 
 function getSensorBaseUrl() {
-    return `http://${getCurrentHost()}:${BACKEND_SENSOR_PORT}`;
+    return `${getCurrentProtocol()}://${getCurrentHost()}:${BACKEND_SENSOR_PORT}`;
 }

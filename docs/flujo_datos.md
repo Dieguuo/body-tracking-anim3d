@@ -36,13 +36,17 @@
    - Extrae las coordenadas (X, Y) de talones y puntas de los pies, más la altura de la persona en píxeles.
    - Devuelve una lista de `FramePies` (un objeto por frame).
 4. **`CalculoService`** (Service) recibe la lista de frames y aplica las fórmulas:
-   - Primero detecta despegue y aterrizaje: suaviza la señal Y de los talones con **media móvil de 3 frames**, calcula la derivada y busca transiciones que superen el umbral (con un **margen ciego de 5 frames** entre despegue y aterrizaje para evitar falsos positivos).
+   - Primero detecta despegue y aterrizaje: suaviza la señal Y de los talones con **media móvil adaptada al FPS**, calcula un baseline de reposo (mediana de los frames iniciales) y marca como "en aire" los frames donde Y cae por debajo de `baseline - umbral`. El umbral es dinámico por tipo de salto:
+     - *Vertical*: `max(1.2, altura_ref × 0.004)` — los pies suben mucho.
+     - *Horizontal*: `max(8.0, altura_ref × 0.02)` — umbral más alto para superar el ruido natural de MediaPipe (±5-7 px), evitando confundir micro-variaciones de postura con vuelo real.
+   - Se selecciona el segmento de vuelo más significativo (profundidad × duración). Los límites de validación temporal son generosos (5s vertical, 8s horizontal) para tolerar vídeos en slow-motion.
+   - **Corrección de slow-motion**: tras detectar la ventana de vuelo, `_detectar_factor_slowmo()` ajusta una parábola a la trayectoria Y de la cadera, compara la aceleración aparente con la gravedad real (9.81 m/s²) y calcula `factor = sqrt(g / g_aparente)`. Si el factor > 1.3, se corrige el FPS: `fps_real = fps_video × factor`. Todos los cálculos posteriores usan `fps_real`.
    - **Salto vertical** (método híbrido): combina dos fórmulas:
-     - *Cinemática*: `h = (1/8) × g × t²` (tiempo de vuelo).
+     - *Cinemática*: `h = (1/8) × g × t²` (tiempo de vuelo corregido).
      - *Píxeles calibrados*: calibra con `S = Hr / Hp` y mide `(Y_suelo - Y_pico) × S`.
      - Si ambas están disponibles, resultado = promedio ponderado (60 % píxeles, 40 % cinemática).
    - **Salto horizontal**: usa la altura real del usuario para calibrar `S = Hr / Hp` (metros/píxel) y calcula `D_real = Dp × S` con el desplazamiento horizontal en píxeles.
-5. **`SaltoController.procesar_salto()`** (Controller) orquesta modelo y servicio, validando los datos de entrada. Si se detecta un salto válido (despegue + aterrizaje), **enriquece** el resultado con análisis avanzado (Fases 6-7).
+5. **`SaltoController.procesar_salto()`** (Controller) orquesta modelo y servicio, validando los datos de entrada. Si se detecta un salto válido (despegue + aterrizaje), **enriquece** el resultado con análisis avanzado (Fases 6-7) usando el FPS corregido por slow-motion.
 6. **Flask `POST /api/salto/calcular`** devuelve JSON:
    ```json
    {
@@ -58,6 +62,7 @@
      "potencia_w": 3182.5,
      "asimetria_pct": 8.3,
      "metodo": "hibrido",
+     "factor_slowmo": 1.0,
      "dist_por_pixeles": 36.45,
      "dist_por_cinematica": 30.67,
      "estabilidad_aterrizaje": { "oscilacion_px": 3.45, "tiempo_estabilizacion_s": 0.267, "estable": true },
@@ -212,7 +217,8 @@ video_anotado_service.generar_video_anotado(ruta_entrada, ruta_salida, frames_ev
      e. Dibuja trayectoria del centro de masa (línea naranja)
   4. Escribe el vídeo anotado como MP4 (codec mp4v)
       │
-Flask devuelve el archivo .mp4 como descarga (send_file)
+Flask lee el archivo en memoria y devuelve un Response con los bytes
+(evita PermissionError en Windows por archivo abierto durante streaming)
       │
-Limpieza: elimina vídeo original y anotado del disco
+Limpieza (finally): elimina vídeo original y anotado del disco con try/except OSError
 ```

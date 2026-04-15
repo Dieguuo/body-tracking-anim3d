@@ -57,8 +57,13 @@ class SaltoModel:
             cls._expr_col(cur, alias, "saltos", "angulo_rodilla_deg"),
             cls._expr_col(cur, alias, "saltos", "angulo_cadera_deg"),
             cls._expr_col(cur, alias, "saltos", "estabilidad_aterrizaje"),
-            cls._expr_col(cur, alias, "saltos", "curvas_json"),
         ]
+
+        if cls._tiene_columna(cur, "saltos", "curvas_json"):
+            extras.append(f"JSON_REMOVE({alias}.curvas_json, '$.landmarks_frames') AS curvas_json")
+        else:
+            extras.append("NULL AS curvas_json")
+
         return ", ".join(base + extras)
 
     def obtener_videos_guardados(
@@ -174,6 +179,44 @@ class SaltoModel:
             if raw and isinstance(raw, str):
                 row["curvas_json"] = json.loads(raw)
             return row
+
+    def obtener_landmarks_por_id(self, id_salto: int) -> dict | None:
+        """Devuelve landmarks frame a frame almacenados en curvas_json."""
+        with get_connection() as (conn, cur):
+            if not self._tiene_columna(cur, "saltos", "curvas_json"):
+                return None
+
+            cur.execute(
+                "SELECT id_salto, curvas_json FROM saltos WHERE id_salto = %s",
+                (id_salto,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+
+            raw = row.get("curvas_json")
+            if not raw:
+                return None
+
+            curvas = raw
+            if isinstance(raw, str):
+                try:
+                    curvas = json.loads(raw)
+                except json.JSONDecodeError:
+                    return None
+
+            if not isinstance(curvas, dict):
+                return None
+
+            frames = curvas.get("landmarks_frames")
+            if not isinstance(frames, list) or len(frames) == 0:
+                return None
+
+            return {
+                "id_salto": id_salto,
+                "total_frames": len(frames),
+                "frames": frames,
+            }
 
     def crear(
         self,

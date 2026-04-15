@@ -478,3 +478,292 @@ Se usa el codec `mp4v` (MPEG-4 Part 2) con extensión `.mp4`. Es
 compatible con todos los navegadores y reproductores sin necesidad de
 codecs adicionales. El vídeo se elimina del disco tras enviarlo al
 cliente (`send_file` + limpieza en `finally`).
+
+---
+
+## Decisiones de la visualización 3D interactiva (Fase 11)
+
+## Persistencia de los 33 landmarks completos
+
+Antes solo se extraían ~9 puntos (pies, rodillas, caderas, hombros) de
+los 33 que ofrece MediaPipe. Para construir un esqueleto completo se
+necesitan los 33. Se modificó `video_processor.py` para extraer todos
+los landmarks (x, y, z, visibility) en cada frame y almacenarlos en el
+campo `FramePies.landmarks`.
+
+Los landmarks se persisten en la columna `curvas_json` de la tabla
+`saltos` como parte del objeto JSON, bajo la clave `landmarks_frames`.
+Esto evita crear una tabla nueva o alterar el esquema de la BD — se
+reutiliza el campo JSON existente que ya almacena curvas angulares.
+
+## Endpoint de landmarks separado del cálculo
+
+Se creó `GET /api/salto/<id>/landmarks` como endpoint independiente
+en vez de incluir los landmarks siempre en la respuesta de
+`POST /api/salto/calcular`. Razón: el array de 33 landmarks × N frames
+puede pesar varios MB; incluirlo siempre penalizaría el tiempo de
+respuesta cuando el frontend solo necesita las métricas.
+
+El cálculo acepta un parámetro opcional `incluir_landmarks=true` para
+casos donde se necesitan ambos datos en una sola petición (primera
+visualización tras analizar).
+
+## Buffer local como fallback de landmarks
+
+Si el backend no devuelve landmarks (ej. vídeo procesado antes de la
+actualización), el frontend usa `landmarksFramesLocalBuffer`: landmarks
+capturados localmente por MediaPipe.js durante la grabación en tiempo
+real. La precisión es menor (modelo lite en navegador vs modelo full en
+backend) pero permite visualizar el esqueleto sin re-procesar el vídeo.
+
+## Canvas 2D antes de Three.js
+
+Se implementó primero un visor 2D con `<canvas>` estándar antes de
+añadir Three.js. Esto permitió validar que los datos de landmarks
+estaban correctos (formato, coordenadas, conexiones) sin la complejidad
+de una escena 3D. El visor 2D se mantiene como fallback para
+dispositivos sin WebGL.
+
+## Mapa de conexiones POSE_CONNECTIONS_33
+
+MediaPipe define 33 landmarks anatómicos pero no documenta un estándar
+de qué pares de puntos deben conectarse visualmente. Se definió
+`POSE_CONNECTIONS_33` en el frontend como array de pares [origen, destino]
+siguiendo la topología del esqueleto humano:
+
+- Cara: ojos, orejas, boca, nariz (landmarks 0–10)
+- Tronco: hombros, caderas (11–12, 23–24)
+- Brazos: hombro → codo → muñeca → mano (11–22)
+- Piernas: cadera → rodilla → tobillo → pie (23–32)
+
+## Three.js por CDN con fallback triple
+
+Three.js no se empaqueta localmente para evitar añadir ~600 KB al
+repositorio. Se carga por CDN con patrón singleton (`threeDepsPromise`)
+y fallback en cascada: esm.sh → unpkg → jsdelivr. Si los tres fallan o
+WebGL no está disponible, se muestra un mensaje y se vuelve al visor 2D
+automáticamente.
+
+Se eligió Three.js v0.160.0 (versión específica) en vez de `@latest`
+para evitar roturas por cambios de API.
+
+## Conversión de coordenadas normalizadas a espacio 3D
+
+MediaPipe devuelve landmarks en coordenadas normalizadas (0–1). Para
+Three.js se transforman:
+
+- **X**: `(x - 0.5) × 2` → centra en el origen, rango [-1, 1]
+- **Y**: `(0.5 - y) × 2` → invierte el eje (MediaPipe: Y↓, Three.js: Y↑)
+- **Z**: `-(z || 0) × 2` → invierte profundidad (MediaPipe: Z hacia cámara)
+
+Esta transformación mantiene las proporciones del cuerpo sin necesidad
+de calibración.
+
+## Limpieza de recursos WebGL con _disposeThreeViewer()
+
+WebGL mantiene estado en la GPU. Sin liberación explícita, al cambiar
+de modo (3D→2D→3D) se acumulan contextos WebGL hasta que el navegador
+los rechaza (límite de ~16 contextos). `_disposeThreeViewer()` cancela
+la animación, desconecta el `ResizeObserver`, libera geometrías y
+materiales, elimina el renderer y limpia el DOM.
+
+## OrbitControls en vez de controles propios
+
+Three.js `OrbitControls` proporciona rotación, pan y zoom con ratón/
+touch de forma estándar. Implementar controles propios sería más trabajo
+y peor UX. Se carga desde el mismo CDN que Three.js para garantizar
+compatibilidad de versión.
+
+## Animación basada en timestamps reales (no intervalo fijo)
+
+El intervalo entre frames de la animación se calcula a partir de los
+timestamps reales del vídeo (`frame[N].timestamp_s - frame[0].timestamp_s`)
+dividido entre el número de frames. Esto respeta la velocidad original del
+vídeo independientemente del FPS de captura. La velocidad configurable
+(×0.25, ×0.5, ×1) divide el intervalo base, produciendo una cámara lenta
+proporcional al movimiento real.
+
+Se usa `setInterval` en vez de `requestAnimationFrame` porque la animación
+debe avanzar a ritmo constante del vídeo, no sincronizada con el refresco
+de pantalla. `requestAnimationFrame` correría a 60 Hz incluso para vídeos
+de 30 FPS, duplicando frames innecesariamente.
+
+## Detección de fase por búsqueda directa en `fases_salto`
+
+En lugar de recalcular la fase del salto en el frontend, `_getFaseParaFrame()`
+recorre el array `fases_salto` (ya calculado por `CinematicoService` en
+backend) y compara `frame_inicio` / `frame_fin` de cada fase. Esto evita
+duplicar la lógica de segmentación y garantiza coherencia entre las fases
+mostradas en el visor 3D y las reportadas en el análisis cinemático.
+
+## Ángulos articulares recalculados en frontend
+
+Los overlays de ángulos recalculan rodilla y cadera en tiempo real con
+`_anguloEntreLandmarks()` (producto escalar + arccos), en vez de usar los
+valores precalculados del backend (`curvas_angulares`). Razón: el backend
+calcula ángulos solo en el rango `[despegue - 15, aterrizaje + 15]`,
+mientras que el visor puede mostrar cualquier frame. Recalcular en frontend
+con la misma fórmula trigonométrica garantiza cobertura completa.
+
+Los valores del panel de métricas (`metRodilla`, `metCadera`) promedian
+izquierda y derecha para dar un ángulo representativo sin saturar la UI
+con 4 valores simultáneos.
+
+## Centro de masa como promedio de caderas (coherente con backend)
+
+La trayectoria del CM en el visor 2D usa el mismo criterio que
+`AterrizajeService` en backend: promedio Y de landmarks 23 y 24 (caderas).
+Esto mantiene coherencia con las métricas de estabilidad y oscilación
+ya calculadas.
+
+## Colores de fase sin paleta configurable
+
+Los colores de fase (`_FASE_COLORES`) se definen como constante en el
+frontend:
+- **Preparatoria**: azul (`#5b8fff`)
+- **Impulsión**: amarillo (`#ffe44d`)
+- **Vuelo**: verde (`#59ffc7`)
+- **Recepción**: rojo (`#ff6e6e`)
+
+Se eligieron por contraste máximo entre fases adyacentes y accesibilidad
+(distinguibles en daltonismo protanopia). No se exponen como configuración
+porque cambiarlos requeriría actualizar también las leyendas y el CSS.
+
+## Ghost skeleton con opacidad en vez de wireframe
+
+El esqueleto de comparación se renderiza como una copia semitransparente
+(2D: 35% opacidad, 3D: 40% opacidad) en color rosa (`#ff8cff`), en lugar
+de usar wireframe o un color similar al esqueleto principal. La opacidad
+reducida permite ver ambos esqueletos superpuestos sin que uno oculte al
+otro, y el rosa contrasta con el verde/naranja del esqueleto principal.
+
+## Mapeo proporcional de frames para comparación
+
+`_mapCompareFrame()` sincroniza los dos saltos por proporción temporal
+(`idx / total_main × total_compare`) en vez de por fase. Razón: la
+sincronización por fase requeriría que ambos saltos tengan exactamente
+las mismas fases detectadas con la misma calidad, lo cual no está
+garantizado. El mapeo proporcional funciona siempre, aunque los saltos
+tengan duraciones diferentes, y da un resultado visualmente coherente
+(ambos esqueletos avanzan al mismo ritmo relativo).
+
+## Geometría ghost lazy en 3D
+
+Los 33 joints y bones del ghost 3D se crean solo cuando el usuario
+selecciona un salto de comparación (`_renderFrameGhost3D()`), no al
+cargar el visor. Esto evita crear 66 objetos Three.js extra por defecto.
+`_removeCompareGhost()` libera toda la geometría (dispose + scene.remove)
+cuando se desactiva la comparación, evitando fugas de memoria GPU.
+
+## Prevención de event listeners duplicados con `dataset.bound`
+
+Los controles de animación, overlays y comparación se inicializan en
+`_bindLandmarksControls()`, que puede llamarse múltiples veces (cada vez
+que se carga un resultado). Se usa `element.dataset.bound = '1'` como
+flag para evitar registrar listeners duplicados. Este patrón es más
+ligero que `removeEventListener` (que requiere guardar referencias a
+funciones con nombre) y no tiene efectos secundarios.
+
+---
+
+## Decisiones de corrección de slow-motion y robustez del pipeline (Fase 12)
+
+## Detección automática de slow-motion por ajuste parabólico
+
+Los móviles modernos graban slow-motion a 120–240 FPS y el contenedor
+del vídeo informa el FPS de reproducción (ej. 30 FPS), pero el movimiento
+real fue capturado a una velocidad mucho mayor. Esto hace que un salto de
+0.5 s reales se vea como 2–4 s en el vídeo, distorsionando todas las
+métricas basadas en tiempo (tiempo de vuelo, velocidades articulares,
+potencia, aceleración).
+
+En vez de pedir al usuario que indique manualmente si el vídeo es slow-mo,
+se usa la **gravedad como reloj universal**: durante la fase de vuelo,
+cualquier objeto sigue una parábola con aceleración = 9.81 m/s².
+
+El método `_detectar_factor_slowmo()`:
+
+1. Extrae la coordenada Y de la cadera (más estable que los pies en vuelo)
+   durante la ventana despegue → aterrizaje.
+2. Ajusta una parábola `y = a·t² + b·t + c` con `np.polyfit(t, y, 2)`.
+3. Extrae la aceleración aparente: `a_aparente = 2·|a| × escala × fps²`,
+   donde `escala = altura_real_m / altura_px`.
+4. Compara con la gravedad real: `factor = sqrt(9.81 / g_aparente)`.
+5. Si `factor > 1.3`, se aplica la corrección: `fps_real = fps_video × factor`.
+
+Se usa la **cadera** en vez de los pies porque durante el vuelo los pies
+oscilan (patada, flexión) mientras la cadera sigue una trayectoria
+balística limpia. El mínimo de 5 frames de vuelo garantiza que el ajuste
+parabólico tenga sentido estadístico.
+
+## Umbral de aplicación del factor slow-motion (1.3)
+
+Un factor entre 0.7 y 1.3 se considera velocidad normal (variación
+por ruido de landmarks, no por slow-motion real). Los móviles graban
+slow-mo típicamente a 2× mínimo, así que factores < 1.3 son falsos
+positivos. El límite superior de 12.0 cubre cámaras profesionales
+(240 FPS reproducidas a 30 = 8×) con margen.
+
+## Validación de vuelo generosa + corrección posterior
+
+La detección de vuelo (`_detectar_vuelo`) ocurre **antes** de calcular
+el factor de slow-motion (necesita la ventana de vuelo para ajustar la
+parábola). Por eso los límites de validación temporal (5.0 s vertical,
+8.0 s horizontal) son generosos: un salto de 0.5 s reales a 8× slow-mo
+produce 4.0 s aparentes, que un límite de 2.0 s rechazaría. La
+corrección temporal precisa se aplica después con el factor calculado.
+
+## Corrección de FPS propagada a todos los servicios
+
+El `factor_slowmo` se almacena en `ResultadoSalto` y el controlador
+calcula `fps_real = info.fps × resultado.factor_slowmo` antes de pasar
+el FPS al enriquecimiento biomecánico y cinemático (Fases 6-7). Esto
+garantiza que las velocidades articulares, tiempos de estabilización y
+ratios excéntrico/concéntrico se calculen con la velocidad real del
+movimiento, no con la velocidad de reproducción del vídeo.
+
+## Lectura en memoria del vídeo anotado (fix Windows)
+
+El endpoint de vídeo anotado usaba `send_file()` de Flask, que mantiene
+el archivo abierto durante el streaming de la respuesta. En Windows,
+esto impide que el bloque `finally` borre el archivo temporal
+(`PermissionError: [WinError 32]`).
+
+Solución: leer el archivo completo en memoria con `open(ruta, "rb")`,
+construir un `Response` con los bytes y los headers de descarga
+(`Content-Disposition: attachment`), y entonces borrar los archivos
+en `finally`. Para vídeos anotados cortos (típicamente < 50 MB) la
+carga en memoria es aceptable y evita la complejidad de `after_this_request`
+o temporizadores de limpieza.
+
+El bloque `finally` ahora envuelve cada `os.remove()` en `try/except
+OSError` para evitar que un fallo de limpieza enmascare el resultado.
+
+## Umbral de detección de vuelo diferenciado por tipo de salto
+
+El detector de vuelo (`_detectar_vuelo`) usa la coordenada Y de los
+talones para decidir si los pies están "en el aire". Se calcula un
+baseline (mediana Y en reposo) y se marca un frame como "en aire" si
+`Y < baseline - umbral`.
+
+El umbral debe ser más alto que el ruido natural de MediaPipe estando
+de pie (±5-7 px) para evitar falsos positivos. Las necesidades varían
+por tipo de salto:
+
+- **Vertical**: `max(1.2, altura_ref × 0.004)` — los pies suben mucho
+  (30-100+ px), así que un umbral bajo funciona bien.
+- **Horizontal**: `max(8.0, altura_ref × 0.02)` — los pies se elevan
+  menos (~20-350 px según la distancia), pero la fase de caminata/
+  preparación genera micro-variaciones de 5-7 px que con un umbral de
+  ~1 px se confunden con vuelo.
+
+El umbral anterior para horizontal (`max(0.9, altura_ref × 0.0025)` =
+~0.99 px) era insuficiente: marcaba prácticamente todo el vídeo como
+vuelo (frame 16→120 de 121 frames), capturando la caminata antes y
+después del salto y produciendo distancias infladas (~336 cm en lugar
+de ~240 cm). El nuevo umbral de ~8 px supera el ruido natural y detecta
+solo la elevación real del salto (frame 19→84).
+
+Este cambio también mejoró la precisión del factor slow-motion (de 6.688
+a 3.233), porque la ventana de vuelo más ajustada produce una parábola
+más limpia para el ajuste gravitatorio.

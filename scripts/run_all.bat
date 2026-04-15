@@ -3,7 +3,7 @@ REM ═════════════════════════�
 REM  Arranca todo el proyecto con un solo doble-clic:
 REM    - Backend Salto    (puerto 5001)
 REM    - Backend Sensor   (puerto 5000)  [opcional]
-REM    - Frontend web     (puerto 8080)
+REM    - Frontend web     (HTTPS puerto 8443)
 REM ══════════════════════════════════════════════════════
 
 cd /d "%~dp0.."
@@ -25,11 +25,16 @@ if not exist "%VENV_PYTHON%" (
 
 REM ── Comprobar que .env existe ──
 if not exist "%PROJECT_ROOT%\.env" (
-    echo  [ERROR] Falta el archivo .env con la configuracion de base de datos.
-    echo          Copia .env.example a .env y rellena tus credenciales:
-    echo          copy .env.example .env
-    pause
-    exit /b 1
+    if not exist "%PROJECT_ROOT%\modules\salto\backend\.env" (
+        echo  [ERROR] Falta el archivo .env con la configuracion de base de datos.
+        echo          Se admite en una de estas rutas:
+        echo            - %PROJECT_ROOT%\.env
+        echo            - %PROJECT_ROOT%\modules\salto\backend\.env
+        echo          Puedes copiar la plantilla con:
+        echo            copy .env.example .env
+        pause
+        exit /b 1
+    )
 )
 
 REM ── Comprobar dependencias criticas ──
@@ -51,18 +56,18 @@ echo.
 
 REM 1) Backend del salto (puerto 5001)
 echo  [1/3] Backend Salto (puerto 5001)...
-start "Backend Salto" cmd /k "cd /d %PROJECT_ROOT%\modules\salto\backend && "%VENV_PYTHON%" app.py"
+start "Backend Salto" cmd /k "cd /d %PROJECT_ROOT%\modules\salto\backend && set CORS_ORIGINS=https://localhost:8443,https://127.0.0.1:8443,http://localhost:8080,http://127.0.0.1:8080 && "%VENV_PYTHON%" app.py"
 
 REM 2) Backend del sensor (puerto 5000) — no falla si no hay Arduino
 echo  [2/3] Backend Sensor (puerto 5000)...
-start "Backend Sensor" cmd /k "cd /d %PROJECT_ROOT%\modules\sensor\backend && "%VENV_PYTHON%" app.py"
+start "Backend Sensor" cmd /k "cd /d %PROJECT_ROOT%\modules\sensor\backend && set CORS_ORIGINS=https://localhost:8443,https://127.0.0.1:8443,http://localhost:8080,http://127.0.0.1:8080 && "%VENV_PYTHON%" app.py"
 
-REM 3) Frontend web (puerto 8080)
-echo  [3/3] Frontend web (puerto 8080)...
-start "Frontend Web" cmd /k "cd /d %PROJECT_ROOT%\integration\web && "%VENV_PYTHON%" -m http.server 8080"
+REM 3) Frontend web HTTPS (puerto 8443)
+echo  [3/3] Frontend web HTTPS (puerto 8443)...
+start "Frontend Web HTTPS" cmd /k "cd /d %PROJECT_ROOT% && "%VENV_PYTHON%" scripts\https_server.py"
 
 echo.
-echo  Todo listo. Abre http://localhost:8080 en el navegador.
+echo  Todo listo. Abre https://localhost:8443 en el navegador.
 echo  Cierra las ventanas de cmd para detener los servicios.
 echo.
 pause

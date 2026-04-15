@@ -14,6 +14,7 @@ Endpoints:
     GET /distancia  → JSON con la última medición
 """
 
+import os
 import sys
 
 from dotenv import load_dotenv
@@ -49,7 +50,18 @@ if __name__ == "__main__":
         print("[ERROR] No se pudo iniciar el sensor. Verifica la conexión del Arduino.")
         sys.exit(1)
 
-    print(f"[INFO] API disponible en http://localhost:{FLASK_PORT}/distancia")
+    project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    cert_file = os.path.join(project_root, "certs", "cert.pem")
+    key_file = os.path.join(project_root, "certs", "key.pem")
+    ssl_context = None
+
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        ssl_context = (cert_file, key_file)
+        print(f"[INFO] API disponible en https://localhost:{FLASK_PORT}/distancia")
+    else:
+        print("[WARN] Certificados SSL no encontrados en certs/. Arrancando en HTTP.")
+        print(f"[INFO] API disponible en http://localhost:{FLASK_PORT}/distancia")
+
     print(f"[INFO] Sirve el frontend con Live Server u otro servidor estático")
     # debug=False es obligatorio: el modo debug relanza el proceso y rompe el hilo de fondo
-    app.run(host="0.0.0.0", port=FLASK_PORT, debug=False)
+    app.run(host="0.0.0.0", port=FLASK_PORT, debug=False, ssl_context=ssl_context)

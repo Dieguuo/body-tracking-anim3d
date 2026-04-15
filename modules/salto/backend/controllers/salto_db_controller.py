@@ -165,9 +165,18 @@ def obtener_curvas(id_salto):
     if not row:
         return jsonify({"error": "Curvas no encontradas para este salto"}), 404
     curvas = row.get("curvas_json")
-    if not curvas:
+    if not isinstance(curvas, dict):
         return jsonify({"error": "Este salto no tiene curvas almacenadas"}), 404
-    return jsonify({"id_salto": id_salto, **curvas})
+
+    payload = {
+        "id_salto": id_salto,
+        "curvas_angulares": curvas.get("curvas_angulares"),
+        "fases_salto": curvas.get("fases_salto"),
+    }
+    if payload["curvas_angulares"] is None and payload["fases_salto"] is None:
+        return jsonify({"error": "Este salto no tiene curvas almacenadas"}), 404
+
+    return jsonify(payload)
 
 
 @saltos_bp.route("/api/saltos/<int:id_salto>", methods=["PUT"])

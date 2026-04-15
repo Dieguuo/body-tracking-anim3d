@@ -125,6 +125,10 @@ def calcular_salto():
     ruta_video = os.path.join(UPLOAD_FOLDER, nombre_archivo)
     archivo.save(ruta_video)
 
+    incluir_landmarks = (request.form.get("incluir_landmarks", "false").strip().lower() in {
+        "1", "true", "si", "sí", "yes"
+    })
+
     try:
         # Buscar peso_kg del usuario si se proporcionó id_usuario
         peso_kg = None
@@ -177,6 +181,15 @@ def calcular_salto():
             fatiga_significativa=fatiga_significativa,
         )
 
+        estabilidad_score = resultado.estabilidad_aterrizaje
+        if isinstance(estabilidad_score, dict):
+            estabilidad_score = None
+        if estabilidad_score is not None:
+            try:
+                estabilidad_score = float(estabilidad_score)
+            except (TypeError, ValueError):
+                estabilidad_score = None
+
         respuesta = {
             "tipo_salto": resultado.tipo_salto,
             "distancia": resultado.distancia,
@@ -189,7 +202,8 @@ def calcular_salto():
             "angulo_cadera_deg": resultado.angulo_cadera_deg,
             "potencia_w": resultado.potencia_w,
             "asimetria_pct": resultado.asimetria_pct,
-            "estabilidad_aterrizaje": resultado.estabilidad_aterrizaje,
+            "estabilidad_aterrizaje": estabilidad_score,
+            "estabilidad_detalle": resultado.estabilidad_detalle,
             "metodo": resultado.metodo,
             "dist_por_pixeles": resultado.dist_por_pixeles,
             "dist_por_cinematica": resultado.dist_por_cinematica,
@@ -205,15 +219,28 @@ def calcular_salto():
             "alertas": alertas,
             "observaciones": observaciones,
             "clasificacion": clasificacion,
+            # Fase 10 — Landmarks 33 puntos (opcional, evita payloads pesados por defecto)
+            "landmarks_frames": resultado.landmarks_frames if incluir_landmarks else None,
+            # Slow-motion
+            "factor_slowmo": resultado.factor_slowmo,
         }
 
         # Guardar en BD si se proporcionó id_usuario
-        if id_usuario_str and resultado.distancia > 0:
+        if id_usuario_str:
             try:
                 id_usuario = int(id_usuario_str)
                 metodo_origen = request.form.get("metodo_origen", "video_galeria").strip().lower()
                 if metodo_origen not in ("ia_vivo", "video_galeria", "sensor_arduino"):
                     metodo_origen = "video_galeria"
+
+                curvas_payload = {}
+                if resultado.curvas_angulares:
+                    curvas_payload["curvas_angulares"] = resultado.curvas_angulares
+                if resultado.fases_salto:
+                    curvas_payload["fases_salto"] = resultado.fases_salto
+                if resultado.landmarks_frames:
+                    curvas_payload["landmarks_frames"] = resultado.landmarks_frames
+
                 id_salto = salto_model.crear(
                     id_usuario=id_usuario,
                     tipo_salto=resultado.tipo_salto,
@@ -225,11 +252,8 @@ def calcular_salto():
                     asimetria_pct=resultado.asimetria_pct,
                     angulo_rodilla_deg=resultado.angulo_rodilla_deg,
                     angulo_cadera_deg=resultado.angulo_cadera_deg,
-                    estabilidad_aterrizaje=resultado.estabilidad_aterrizaje,
-                    curvas_json={
-                        "curvas_angulares": resultado.curvas_angulares,
-                        "fases_salto": resultado.fases_salto,
-                    } if resultado.curvas_angulares else None,
+                    estabilidad_aterrizaje=estabilidad_score,
+                    curvas_json=curvas_payload or None,
                 )
                 respuesta["id_salto"] = id_salto
 
@@ -259,6 +283,15 @@ def calcular_salto():
         # Limpiar archivo temporal
         if os.path.exists(ruta_video):
             os.remove(ruta_video)
+
+
+@app.route("/api/salto/<int:id_salto>/landmarks", methods=["GET"])
+def obtener_landmarks_salto(id_salto: int):
+    """Devuelve los 33 landmarks por frame para un salto guardado."""
+    data = salto_model.obtener_landmarks_por_id(id_salto)
+    if not data:
+        return jsonify({"error": "Landmarks no encontrados para este salto"}), 404
+    return jsonify(data)
 
 
 @app.route("/api/salto/video-anotado", methods=["POST"])
@@ -331,24 +364,47 @@ def video_anotado():
         if not exito:
             return jsonify({"error": "No se pudo generar el vídeo anotado"}), 500
 
-        return send_file(
-            ruta_salida,
+        # Leer el archivo en memoria para evitar PermissionError en Windows
+        # (send_file mantiene el archivo abierto durante el streaming y
+        # el bloque finally no puede borrarlo).
+        with open(ruta_salida, "rb") as f:
+            video_data = f.read()
+
+        response = app.response_class(
+            video_data,
             mimetype="video/mp4",
-            as_attachment=True,
-            download_name="salto_anotado.mp4",
+            headers={
+                "Content-Disposition": "attachment; filename=salto_anotado.mp4",
+                "Content-Length": str(len(video_data)),
+            },
         )
+        return response
     except Exception:
         logging.exception("Error generando vídeo anotado")
         return jsonify({"error": "Error interno al generar el vídeo anotado"}), 500
     finally:
         for ruta in [ruta_entrada, ruta_salida]:
-            if os.path.exists(ruta):
-                os.remove(ruta)
+            try:
+                if os.path.exists(ruta):
+                    os.remove(ruta)
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":
-    logging.info("Módulo Salto — API disponible en http://localhost:%s", FLASK_PORT)
+    project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    cert_file = os.path.join(project_root, "certs", "cert.pem")
+    key_file = os.path.join(project_root, "certs", "key.pem")
+    ssl_context = None
+
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        ssl_context = (cert_file, key_file)
+        logging.info("Módulo Salto — API disponible en https://localhost:%s", FLASK_PORT)
+    else:
+        logging.warning("Certificados SSL no encontrados en certs/. Arrancando en HTTP.")
+        logging.info("Módulo Salto — API disponible en http://localhost:%s", FLASK_PORT)
+
     logging.info("POST /api/salto/calcular")
     logging.info("POST /api/salto/video-anotado")
     logging.info("CRUD /api/usuarios, /api/saltos")
-    app.run(host="0.0.0.0", port=FLASK_PORT, debug=False)
+    app.run(host="0.0.0.0", port=FLASK_PORT, debug=False, ssl_context=ssl_context)

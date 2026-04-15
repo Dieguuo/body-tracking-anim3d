@@ -60,9 +60,25 @@ class SaltoController:
 
         # Fase 6+7: análisis avanzado solo si se detectó un salto válido
         if resultado.frame_despegue is not None and resultado.frame_aterrizaje is not None:
-            self._enriquecer_con_analisis(resultado, frames, info.fps)
+            # Usar FPS corregido si se detectó slow-motion
+            fps_real = info.fps * resultado.factor_slowmo
+            self._enriquecer_con_analisis(resultado, frames, fps_real)
+
+        resultado.landmarks_frames = self._serializar_landmarks(frames)
 
         return resultado
+
+    @staticmethod
+    def _serializar_landmarks(frames: list) -> list[dict]:
+        """Convierte los landmarks de cada frame a un formato JSON serializable."""
+        salida: list[dict] = []
+        for frame in frames:
+            salida.append({
+                "frame_idx": frame.frame_idx,
+                "timestamp_s": frame.timestamp_s,
+                "landmarks": frame.landmarks,
+            })
+        return salida
 
     @staticmethod
     def _enriquecer_con_analisis(
@@ -75,7 +91,7 @@ class SaltoController:
         aterr = resultado.frame_aterrizaje
 
         # ── Fase 6 — Biomecánica del aterrizaje ──
-        resultado.estabilidad_aterrizaje = AterrizajeService.analizar_estabilidad(frames, aterr, fps)
+        resultado.estabilidad_detalle = AterrizajeService.analizar_estabilidad(frames, aterr, fps)
         resultado.amortiguacion = AterrizajeService.analizar_amortiguacion(frames, aterr)
         resultado.asimetria_recepcion_pct = AterrizajeService.analizar_simetria_recepcion(frames, aterr)
 

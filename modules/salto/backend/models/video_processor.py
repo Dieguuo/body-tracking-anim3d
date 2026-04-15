@@ -65,6 +65,8 @@ class FramePies:
     rodilla_y: float | None
     tobillo_x: float | None
     tobillo_y: float | None
+    # Landmarks completos de MediaPipe (33 puntos) en coordenadas normalizadas.
+    landmarks: list[dict] | None
 
 
 @dataclass
@@ -157,6 +159,7 @@ class VideoProcessor:
                 cadera_x=None, cadera_y=None,
                 rodilla_x=None, rodilla_y=None,
                 tobillo_x=None, tobillo_y=None,
+                landmarks=None,
             )
 
         # Buscar la silueta más grande (la persona real frente a la cámara)
@@ -184,6 +187,7 @@ class VideoProcessor:
                 cadera_x=None, cadera_y=None,
                 rodilla_x=None, rodilla_y=None,
                 tobillo_x=None, tobillo_y=None,
+                landmarks=None,
             )
 
         lm = mejor_lm
@@ -199,6 +203,15 @@ class VideoProcessor:
             x_izq, y_izq = px_x(i_izq), px_y(i_izq)
             x_der, y_der = px_x(i_der), px_y(i_der)
             return ((x_izq + x_der) / 2.0, (y_izq + y_der) / 2.0)
+
+        landmarks_completos = []
+        for p in lm:
+            landmarks_completos.append({
+                "x": float(p.x),
+                "y": float(p.y),
+                "z": float(p.z),
+                "visibility": float(p.visibility) if hasattr(p, "visibility") else None,
+            })
 
         hombro_x, hombro_y = promedio_par(LANDMARK_HOMBRO_IZQ, LANDMARK_HOMBRO_DER)
         cadera_x, cadera_y = promedio_par(LANDMARK_CADERA_IZQ, LANDMARK_CADERA_DER)
@@ -225,6 +238,7 @@ class VideoProcessor:
             rodilla_y=rodilla_y,
             tobillo_x=tobillo_x,
             tobillo_y=tobillo_y,
+            landmarks=landmarks_completos,
         )
 
 
