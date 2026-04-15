@@ -32,8 +32,14 @@ La página web necesita su propio servidor de archivos estáticos para cargar lo
 cd integration/web
 ```
 
-3. Levantar el servidor HTTP nativo de Python en el puerto 8080:
+3. Levantar el servidor frontend:
 
+**HTTPS (recomendado) — ejecutar desde la raíz del proyecto:**
+```bash
+python scripts/https_server.py
+```
+
+**HTTP (sin cámara en móvil) — ejecutar desde integration/web:**
 ```bash
 python -m http.server 8080
 ```
@@ -46,7 +52,9 @@ El método de acceso varía dependiendo de si se utiliza el mismo equipo de desa
 
 Abrir cualquier navegador web y escribir la siguiente dirección:
 
-http://localhost:8080
+https://localhost:8443
+
+> Si se usa HTTP: `http://localhost:8080`
 
 ### Pruebas desde un dispositivo móvil (Recomendado para usar la cámara)
 
@@ -54,7 +62,9 @@ http://localhost:8080
 2. Averiguar la dirección IP local del ordenador (por ejemplo, mediante el comando `ipconfig` en Windows o `ifconfig` en macOS/Linux). Suelen tener el formato `192.168.1.X`.
 3. Abrir el navegador en el teléfono móvil y escribir la IP seguida del puerto:
 
-http://192.168.1.X:8080
+https://192.168.1.X:8443
+
+> Aceptar el aviso de certificado autofirmado. Si se usa HTTP en vez de HTTPS, usar `http://192.168.1.X:8080` (la cámara puede no funcionar).
 
 ## Resolución de Problemas (Troubleshooting)
 

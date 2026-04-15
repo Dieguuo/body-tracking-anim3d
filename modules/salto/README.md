@@ -28,7 +28,12 @@ salto/
 │   │   ├── cinematico_service.py    ← Análisis cinemático temporal: curvas angulares, fases, velocidades
 │   │   ├── video_anotado_service.py ← Generación de vídeo con overlay (landmarks + ángulos + eventos)
 │   │   ├── analitica_service.py     ← Fatiga intra-sesión + tendencia histórica
-│   │   └── comparativa_service.py   ← Lógica de negocio: progreso (mín. 4+4) y estadísticas
+│   │   ├── comparativa_service.py   ← Lógica de negocio: progreso (mín. 4+4) y estadísticas
+│   │   ├── interpretacion_service.py ← Alertas biomecánicas, observaciones y clasificación
+│   │   └── video_library_service.py ← Clasificación de vídeos individuales y comparativas
+│   ├── utils/
+│   │   ├── serializers.py           ← Serialización JSON compartida (Decimal/datetime)
+│   │   └── session_utils.py         ← Agrupación de sesiones + conversión de fechas
 │   └── uploads/                     ← Vídeos temporales (auto-limpieza)
 ├── mobile/                          # Reservado — cliente móvil (Fase 2)
 └── README.md
@@ -82,7 +87,8 @@ Content-Type: multipart/form-data
   "metodo": "hibrido",
   "dist_por_pixeles": 36.45,
   "dist_por_cinematica": 30.67,
-  "estabilidad_aterrizaje": {
+  "estabilidad_aterrizaje": 72.5,
+  "estabilidad_detalle": {
     "oscilacion_px": 3.45,
     "tiempo_estabilizacion_s": 0.267,
     "estable": true
@@ -125,7 +131,8 @@ Content-Type: multipart/form-data
 ```
 
 > Los campos `metodo`, `dist_por_pixeles` y `dist_por_cinematica` solo aparecen en salto vertical.
-> Los campos de Fases 6-7 (`estabilidad_aterrizaje`, `amortiguacion`, etc.) son `null` si no se detectó un salto válido (despegue + aterrizaje).
+> Los campos de Fases 6-7 (`estabilidad_aterrizaje`, `estabilidad_detalle`, `amortiguacion`, etc.) son `null` si no se detectó un salto válido (despegue + aterrizaje).  
+> `estabilidad_aterrizaje` es un score numérico (float); el detalle biomécanico se devuelve en `estabilidad_detalle`.
 
 ### Vídeo anotado con overlay
 
@@ -158,6 +165,7 @@ CalculoService          (Servicio)    — fórmulas de cinemática y calibració
       │
       ├── AterrizajeService             — Fase 6: estabilidad, amortiguación, simetría recepción
       ├── CinematicoService             — Fase 7: curvas angulares, fases, velocidades, resumen
+      ├── InterpretacionService         — Fase 9: alertas biomecánicas y clasificación
       │
 SaltoController         (Controlador) — orquesta modelo + servicios + enriquecimiento
       │
@@ -337,4 +345,10 @@ MediaPipe se configura con `num_poses=2` para detectar hasta dos personas. Si ha
 - [x] Timeline interactivo con fases coloreadas y marcadores de eventos
 - [x] Gráficas de curvas articulares (Chart.js — rodilla y cadera vs tiempo)
 - [x] Vídeo anotado con overlay (`POST /api/salto/video-anotado`)
+- [x] Alertas biomecánicas e interpretación automática (Fase 9)
+- [x] Biblioteca de vídeos guardados con clasificación individual/comparativa (Fase 8.4)
+- [x] Detección y corrección automática de slow-motion (Fase 12)
+- [x] Visor de landmarks 2D/3D frame a frame con Three.js (Fase 11)
+- [x] Comparativa de saltos con esqueleto ghost superpuesto
+- [x] Estadísticas avanzadas y correlaciones (Fase 10)
 - [ ] Cliente móvil para grabar y enviar vídeo (`mobile/`)

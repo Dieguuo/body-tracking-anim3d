@@ -6,5 +6,5 @@ FLASK_PORT: int = int(os.getenv("SENSOR_PORT", "5000"))
 
 # Orígenes permitidos para CORS
 CORS_ORIGINS: list[str] = os.getenv(
-    "CORS_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080"
+    "CORS_ORIGINS", "https://localhost:8443,https://127.0.0.1:8443,http://localhost:8080,http://127.0.0.1:8080"
 ).split(",")
