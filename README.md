@@ -1,56 +1,39 @@
-# Proyecto-Medición
+# Anim3D — Módulo de Análisis de Saltos
 
-Plataforma web modular para captura, procesamiento y visualización de **mediciones físicas en tiempo real**.
-
-El proyecto integra múltiples fuentes de datos (Arduino, sensores móviles) bajo una misma arquitectura:
+Módulo integrable para captura, procesamiento y visualización de **saltos verticales y horizontales** mediante vídeo e IA (MediaPipe).
 
 ```
-Dispositivo físico → Python (backend) → Flask (API REST) → Interfaz web
+Vídeo / Sensor Arduino → Python (Flask API) → Análisis biomecánico → Frontend web
 ```
 
-Cada funcionalidad se desarrolla como un **módulo independiente**. Los módulos se unen en la fase de integración final bajo una única app web.
-
-Documentación detallada en [`docs/`](docs/).
+Para instrucciones de integración en otra aplicación web, ver [`deploy/README_INTEGRACION.md`](deploy/README_INTEGRACION.md).
 
 ---
 
-## Módulos del proyecto
+## Módulos
 
-| Módulo | Estado | Descripción |
-|--------|--------|-------------|
-| **Módulo 1 — Sensor Arduino** | ✅ Completado | Mide distancia con HC-SR04, expone los datos via API REST |
-| **Módulo 2 — Salto con móvil** | ✅ Backend completado | Analiza vídeo con MediaPipe, calcula salto vertical/horizontal, análisis biomecánico completo |
-| **Base de datos** | ✅ Completada | MySQL — CRUD usuarios/saltos, progreso y comparativa |
-| **Integración web** | ✅ Completada | Frontend web unificado (landing + salto + sensor) |
+| Módulo | Descripción |
+|--------|-------------|
+| **Salto** | Analiza vídeo con MediaPipe, calcula salto vertical/horizontal, biomecánica, cinemática, comparativas |
+| **Sensor Arduino** | Mide distancia con HC-SR04, expone datos vía API REST |
+| **Base de datos** | MySQL — CRUD usuarios/saltos, progreso y analítica avanzada |
+| **Frontend web** | Interfaz unificada (landing + salto + registro + vídeos + sensor) |
 
 ---
 
 ## Estructura del proyecto
 
 ```
-proyecto-medicion/
+body-tracking-anim3d/
 │
 ├── README.md
 ├── requirements.txt
-│
-├── docs/
-│   ├── arquitectura.md          ← Diagrama de capas y tecnologías
-│   ├── flujo_datos.md           ← Paso a paso del dato desde el dispositivo al navegador
-│   ├── fases_proyecto.md        ← Estado de cada fase
-│   ├── decisiones_tecnicas.md   ← Justificaciones de diseño
-│   ├── manual_usuario.md        ← Guía de uso paso a paso
-│   ├── entrega_cambios_2026-04-13.md  ← Traspaso técnico de la jornada 2026-04-13
-│   ├── historial_tecnico_2026-04-13.md ← Historial de cambios técnicos
-│   └── checklist_validacion_salto_vh_realtime_galeria.md ← Checklist funcional
+├── .env.example
 │
 ├── modules/
-│   ├── sensor/                  ← Módulo 1 (completado)
+│   ├── sensor/
 │   │   ├── README.md
-│   │   ├── arduino/
-│   │   │   └── sensor_distancia/
-│   │   │       ├── sensor_distancia.ino
-│   │   │       └── README.md
-│   │   └── backend/             ← Python MVC + Flask API (GET /distancia)
+│   │   └── backend/             ← Flask API (GET /distancia)
 │   │       ├── app.py
 │   │       ├── main.py          ← Entry point consola (sin web)
 │   │       ├── config.py
@@ -58,128 +41,85 @@ proyecto-medicion/
 │   │       ├── models/
 │   │       └── views/
 │   │
-│   └── salto/                   ← Módulo 2 (backend completado)
+│   └── salto/
 │       ├── README.md
-│       ├── backend/             ← Python MVC + Flask API + MediaPipe + MySQL
-│       │   ├── app.py           ← Entry point web (cálculo + CRUD usuarios/saltos)
-│       │   ├── config.py        ← Constantes + DB_CONFIG
-│       │   ├── pose_landmarker_lite.task
-│       │   ├── controllers/     ← salto_controller + usuario_controller + salto_db_controller
-│       │   ├── models/          ← video_processor + db + usuario_model + salto_model
-│       │   ├── services/        ← calculo + biomecanica + aterrizaje + cinematico + video_anotado + analitica + comparativa + interpretacion + video_library
-│       │   └── utils/           ← serializers + session_utils (utilidades compartidas)
-│       └── mobile/              # Reservado — cliente móvil
+│       └── backend/             ← Flask API + MediaPipe + MySQL
+│           ├── app.py
+│           ├── config.py
+│           ├── pose_landmarker_lite.task
+│           ├── controllers/
+│           ├── models/
+│           ├── services/
+│           └── utils/
 │
 ├── integration/
 │   ├── README.md
-│   ├── backend/                 # Reservado — gateway/orquestador
-│   └── web/                     ← Frontend web unificado
-│       ├── index.html           ← Landing con cards de módulos
-│       ├── salto.html           ← Grabación + análisis de salto
-│       ├── registro.html        ← Registro y gestión de usuarios
-│       ├── videos.html          ← Biblioteca de vídeos guardados
-│       ├── arduino.html         ← Lectura sensor en tiempo real
+│   └── web/                     ← Frontend web
+│       ├── index.html
+│       ├── salto.html
+│       ├── registro.html
+│       ├── videos.html
+│       ├── arduino.html
 │       ├── css/style.css
 │       └── js/
-│           ├── app.js           ← Animaciones del landing
-│           ├── camara.js        ← Grabación vídeo / subida archivo
-│           ├── api_salto.js     ← Envío a API salto + resultados
-│           ├── api_sensor.js    ← Polling a API sensor
-│           ├── api-client.js    ← fetchJson() compartido por todas las páginas
-│           ├── config.js        ← URLs de backend (auto HTTP/HTTPS)
-│           ├── registro.js      ← CRUD de usuarios
-│           └── videos.js        ← Biblioteca de vídeos guardados
+│           ├── config.js        ← ★ Configuración de URLs (window.ANIM3D_CONFIG)
+│           ├── api-client.js
+│           ├── api_salto.js
+│           ├── api_sensor.js
+│           ├── app.js
+│           ├── camara.js
+│           ├── registro.js
+│           └── videos.js
 │
 ├── scripts/
-│   ├── run_all.bat              ← Arranca todo con un doble-clic
-│   ├── setup.bat                ← Onboarding: crea venv, instala dependencias, verifica .env
-│   ├── https_server.py          ← Servidor HTTPS para el frontend (puerto 8443)
-│   ├── generate_cert.py         ← Generador de certificado autofirmado
-│   ├── init_db.sql              ← Script SQL para crear la base de datos
-│   └── debug_video.py           ← Utilidad de diagnóstico de vídeos
+│   ├── init_db.sql              ← Inicialización de base de datos
+│   └── README.md
 │
-├── tests/                       # Reservado
+├── deploy/
+│   ├── CONTENIDO.md             ← Manifiesto de entrega
+│   └── README_INTEGRACION.md    ← Guía completa de integración
 │
-└── img/                         # imágenes, capturas, etc.
+└── uploads/
 ```
 
 ---
 
-## Cómo ejecutar
+## Requisitos
 
-### Prerrequisitos
+- Python 3.10+
+- MySQL 8.0+
+- HTTPS (obligatorio para `getUserMedia`)
 
-```powershell
-# Desde la raíz del proyecto
-.\.venv\Scripts\Activate.ps1
+```bash
 pip install -r requirements.txt
+mysql -u root -p < scripts/init_db.sql
 ```
 
-### Arranque rápido (todo a la vez)
+## Configuración
 
-Doble clic en `scripts\run_all.bat` → abre **https://localhost:8443**.
+Copiar `.env.example` a `.env` y ajustar (ver [.env.example](.env.example)):
 
-### Arranque manual — HTTPS (recomendado)
+```env
+DB_PASSWORD=tu_contraseña
+CORS_ORIGINS=https://midominio.com
+SALTO_PORT=5001
+SENSOR_PORT=5000
+```
 
-HTTPS es necesario para usar la cámara del móvil.
+## Arranque
 
-```powershell
-# 1. Generar certificado (solo la primera vez o si cambia la red)
-python scripts\generate_cert.py
-
-# 2. Backend salto (puerto 5001)
-cd modules\salto\backend
+```bash
+# Backend salto (puerto 5001)
+cd modules/salto/backend
 python app.py
 
-# 3. Backend sensor (puerto 5000, requiere Arduino conectado)
-cd modules\sensor\backend
+# Backend sensor (puerto 5000, requiere Arduino conectado)
+cd modules/sensor/backend
 python app.py
-
-# 4. Frontend HTTPS (puerto 8443)
-python scripts\https_server.py
 ```
 
-Abrir **https://localhost:8443** en el navegador (aceptar el certificado autofirmado).
-
-### Arranque manual — HTTP (sin cámara en móvil)
-
-```powershell
-# Backend salto
-cd modules\salto\backend && python app.py
-
-# Backend sensor
-cd modules\sensor\backend && python app.py
-
-# Frontend HTTP (puerto 8080)
-cd integration\web
-python -m http.server 8080
-```
-
-Abrir **http://localhost:8080** en el navegador.
-
-### Modo consola del sensor (sin web, para test rápido)
-
-```powershell
-cd modules\sensor\backend
-python main.py
-```
-
----
-
-## Arquitectura del módulo sensor
-
-```
-Arduino (HC-SR04)
-      │  Serial USB · 9600 baudios · cada 500 ms
-      ▼
-SensorSerial          (Model)       — lee y parsea líneas del puerto serie
-      │
-DistanciaController   (Controller)  — hilo daemon + estado thread-safe
-      │
-app.py / Flask        (API)         — GET /distancia → JSON
-      │
-integration/web/      (Frontend)    — fetch cada 1 s → actualiza DOM
-```
+El frontend se sirve como contenido estático vía proxy inverso o servidor web.
+Ver [deploy/README_INTEGRACION.md](deploy/README_INTEGRACION.md) para la configuración completa.
 
 ---
 
@@ -187,10 +127,7 @@ integration/web/      (Frontend)    — fetch cada 1 s → actualiza DOM
 
 | Documento | Contenido |
 |-----------|-----------|
-| [docs/arquitectura.md](docs/arquitectura.md) | Diagrama de capas y tecnologías |
-| [docs/flujo_datos.md](docs/flujo_datos.md) | Paso a paso del dato desde el dispositivo al navegador |
-| [docs/fases_proyecto.md](docs/fases_proyecto.md) | Estado de cada fase del proyecto |
-| [docs/decisiones_tecnicas.md](docs/decisiones_tecnicas.md) | Justificaciones de diseño (hilos, locks, parseo, MVC, BD, biomecánica) |
-| [docs/manual_usuario.md](docs/manual_usuario.md) | Guía de uso paso a paso para el usuario final || [docs/entrega_cambios_2026-04-13.md](docs/entrega_cambios_2026-04-13.md) | Traspaso técnico de cambios (2026-04-13) |
-| [docs/historial_tecnico_2026-04-13.md](docs/historial_tecnico_2026-04-13.md) | Historial técnico detallado |
-| [docs/checklist_validacion_salto_vh_realtime_galeria.md](docs/checklist_validacion_salto_vh_realtime_galeria.md) | Checklist de validación funcional |
+| [deploy/README_INTEGRACION.md](deploy/README_INTEGRACION.md) | Guía de integración, endpoints API, proxy nginx, checklist |
+| [deploy/CONTENIDO.md](deploy/CONTENIDO.md) | Manifiesto de archivos del módulo |
+| [modules/salto/README.md](modules/salto/README.md) | Documentación del módulo de saltos |
+| [modules/sensor/README.md](modules/sensor/README.md) | Documentación del módulo sensor |

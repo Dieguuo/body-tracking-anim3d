@@ -35,7 +35,6 @@ salto/
 │   │   ├── serializers.py           ← Serialización JSON compartida (Decimal/datetime)
 │   │   └── session_utils.py         ← Agrupación de sesiones + conversión de fechas
 │   └── uploads/                     ← Vídeos temporales (auto-limpieza)
-├── mobile/                          # Reservado — cliente móvil (Fase 2)
 └── README.md
 ```
 
@@ -351,4 +350,4 @@ MediaPipe se configura con `num_poses=2` para detectar hasta dos personas. Si ha
 - [x] Visor de landmarks 2D/3D frame a frame con Three.js (Fase 11)
 - [x] Comparativa de saltos con esqueleto ghost superpuesto
 - [x] Estadísticas avanzadas y correlaciones (Fase 10)
-- [ ] Cliente móvil para grabar y enviar vídeo (`mobile/`)
+

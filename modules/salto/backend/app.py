@@ -46,7 +46,7 @@ CORS(app, origins=CORS_ORIGINS)
 @app.after_request
 def agregar_cabeceras_seguridad(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
@@ -69,6 +69,21 @@ def archivo_demasiado_grande(e):
     return jsonify({
         "error": f"El archivo excede el límite de {MAX_UPLOAD_MB} MB"
     }), 413
+
+
+@app.errorhandler(404)
+def recurso_no_encontrado(e):
+    return jsonify({"error": "Recurso no encontrado"}), 404
+
+
+@app.errorhandler(405)
+def metodo_no_permitido(e):
+    return jsonify({"error": "Método no permitido"}), 405
+
+
+@app.errorhandler(500)
+def error_interno(e):
+    return jsonify({"error": "Error interno del servidor"}), 500
 
 
 @app.route("/api/salto/calcular", methods=["POST"])
@@ -392,17 +407,22 @@ def video_anotado():
 
 
 if __name__ == "__main__":
-    project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-    cert_file = os.path.join(project_root, "certs", "cert.pem")
-    key_file = os.path.join(project_root, "certs", "key.pem")
+    _cert_dir = os.getenv("SSL_CERT_DIR")
+    if not _cert_dir:
+        _cert_dir = os.path.join(
+            os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..")),
+            "certs"
+        )
+    cert_file = os.path.join(_cert_dir, os.getenv("SSL_CERT_FILE", "cert.pem"))
+    key_file = os.path.join(_cert_dir, os.getenv("SSL_KEY_FILE", "key.pem"))
     ssl_context = None
 
     if os.path.exists(cert_file) and os.path.exists(key_file):
         ssl_context = (cert_file, key_file)
-        logging.info("Módulo Salto — API disponible en https://localhost:%s", FLASK_PORT)
+        logging.info("Módulo Salto — API disponible en https://0.0.0.0:%s", FLASK_PORT)
     else:
-        logging.warning("Certificados SSL no encontrados en certs/. Arrancando en HTTP.")
-        logging.info("Módulo Salto — API disponible en http://localhost:%s", FLASK_PORT)
+        logging.warning("Certificados SSL no encontrados en %s. Arrancando en HTTP.", _cert_dir)
+        logging.info("Módulo Salto — API disponible en http://0.0.0.0:%s", FLASK_PORT)
 
     logging.info("POST /api/salto/calcular")
     logging.info("POST /api/salto/video-anotado")

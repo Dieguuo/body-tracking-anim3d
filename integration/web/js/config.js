@@ -1,7 +1,21 @@
 /**
  * config.js — Constantes y utilidades compartidas por todos los módulos JS.
  *
- * Centraliza puertos y URLs del backend para no repetirlos en cada script.
+ * Centraliza URLs del backend para no repetirlas en cada script.
+ *
+ * INTEGRACIÓN: para configurar los endpoints desde la app anfitriona,
+ * definir window.ANIM3D_CONFIG antes de cargar este script. Ejemplo:
+ *
+ *   <script>
+ *     window.ANIM3D_CONFIG = {
+ *       BACKEND_SALTO_URL: "https://api.midominio.com/salto",
+ *       BACKEND_SENSOR_URL: "https://api.midominio.com/sensor"
+ *     };
+ *   </script>
+ *   <script src="js/config.js"></script>
+ *
+ * Si no se define, se auto-detecta usando el host y protocolo actuales
+ * con los puertos por defecto (desarrollo local).
  */
 
 const BACKEND_SALTO_PORT = 5001;
@@ -21,9 +35,15 @@ function getCurrentProtocol() {
 }
 
 function getBackendBaseUrl() {
+    if (window.ANIM3D_CONFIG && window.ANIM3D_CONFIG.BACKEND_SALTO_URL) {
+        return window.ANIM3D_CONFIG.BACKEND_SALTO_URL.replace(/\/+$/, '');
+    }
     return `${getCurrentProtocol()}://${getCurrentHost()}:${BACKEND_SALTO_PORT}`;
 }
 
 function getSensorBaseUrl() {
+    if (window.ANIM3D_CONFIG && window.ANIM3D_CONFIG.BACKEND_SENSOR_URL) {
+        return window.ANIM3D_CONFIG.BACKEND_SENSOR_URL.replace(/\/+$/, '');
+    }
     return `${getCurrentProtocol()}://${getCurrentHost()}:${BACKEND_SENSOR_PORT}`;
 }

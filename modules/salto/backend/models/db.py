@@ -39,6 +39,7 @@ class get_connection:
     def __enter__(self):
         self.conn = _get_pool().get_connection()
         try:
+            self.conn.ping(reconnect=True, attempts=2, delay=1)
             self.cursor = self.conn.cursor(dictionary=True)
         except Exception:
             self.conn.close()

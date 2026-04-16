@@ -1,3 +1,13 @@
+/*
+ * style.css — Estilos del módulo Anim3D Saltos.
+ *
+ * INTEGRACIÓN: este archivo contiene selectores globales (*, body, html)
+ * pensados para funcionar como página independiente. Si se embebe sin iframe,
+ * envolver todo el HTML del módulo en un <div class="anim3d-root"> y
+ * re-alcanzar estos selectores, o bien cargarlo dentro de un Shadow DOM.
+ * La opción recomendada es usar <iframe> (ver deploy/README_INTEGRACION.md §6).
+ */
+
 /* Variables de color corporativos extraídos de la web Anim3D - Ajustado para ser más claro */
 :root {
     --bg-dark: #221a2e; /* Fondo violeta oscuro más claro para mejor visibilidad */

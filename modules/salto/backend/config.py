@@ -43,8 +43,8 @@ UPLOAD_FOLDER: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), "u
 # Extensiones de vídeo permitidas
 EXTENSIONES_PERMITIDAS: set = {".mp4", ".webm", ".avi", ".mov"}
 
-# Tamaño máximo de archivo subido (100 MB)
-MAX_UPLOAD_MB: int = 100
+# Tamaño máximo de archivo subido (MB)
+MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "100"))
 
 # ── Configuración de base de datos MySQL ──
 # Las credenciales se leen de variables de entorno (archivo .env en la raíz).

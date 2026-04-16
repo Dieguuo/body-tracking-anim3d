@@ -31,6 +31,15 @@ CORS(app, origins=CORS_ORIGINS)
 controller = DistanciaController(baud_rate=DEFAULT_BAUD_RATE)
 
 
+@app.after_request
+def agregar_cabeceras_seguridad(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
 @app.route("/distancia")
 def get_distancia():
     """Devuelve la última medición del sensor como JSON."""
@@ -50,17 +59,22 @@ if __name__ == "__main__":
         print("[ERROR] No se pudo iniciar el sensor. Verifica la conexión del Arduino.")
         sys.exit(1)
 
-    project_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-    cert_file = os.path.join(project_root, "certs", "cert.pem")
-    key_file = os.path.join(project_root, "certs", "key.pem")
+    _cert_dir = os.getenv("SSL_CERT_DIR")
+    if not _cert_dir:
+        _cert_dir = os.path.join(
+            os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..")),
+            "certs"
+        )
+    cert_file = os.path.join(_cert_dir, os.getenv("SSL_CERT_FILE", "cert.pem"))
+    key_file = os.path.join(_cert_dir, os.getenv("SSL_KEY_FILE", "key.pem"))
     ssl_context = None
 
     if os.path.exists(cert_file) and os.path.exists(key_file):
         ssl_context = (cert_file, key_file)
-        print(f"[INFO] API disponible en https://localhost:{FLASK_PORT}/distancia")
+        print(f"[INFO] API disponible en https://0.0.0.0:{FLASK_PORT}/distancia")
     else:
-        print("[WARN] Certificados SSL no encontrados en certs/. Arrancando en HTTP.")
-        print(f"[INFO] API disponible en http://localhost:{FLASK_PORT}/distancia")
+        print(f"[WARN] Certificados SSL no encontrados en {_cert_dir}. Arrancando en HTTP.")
+        print(f"[INFO] API disponible en http://0.0.0.0:{FLASK_PORT}/distancia")
 
     print(f"[INFO] Sirve el frontend con Live Server u otro servidor estático")
     # debug=False es obligatorio: el modo debug relanza el proceso y rompe el hilo de fondo

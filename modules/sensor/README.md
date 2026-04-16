@@ -26,10 +26,7 @@ sensor/
 ```powershell
 # Desde la raíz del proyecto (activar venv primero)
 
-# Opción 1 — Arrancar todo (backends + frontend)
-scripts\run_all.bat
-
-# Opción 2 — Solo el backend del sensor
+# Backend del sensor
 cd modules\sensor\backend
 python app.py
 ```
