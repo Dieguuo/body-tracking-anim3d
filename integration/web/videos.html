@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Biblioteca de vídeos</title>
     <link rel="stylesheet" href="css/style.css">
+    <script>
+        // Integración: el backend Flask se sirve a través de nginx en el mismo origen.
+        window.ANIM3D_CONFIG = { BACKEND_SALTO_URL: window.location.origin };
+    </script>
 </head>
 <body class="videos-page">
     <header class="top-bar">

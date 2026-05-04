@@ -1,0 +1,64 @@
+# =============================================================================
+# Plantilla systemd para arrancar una instancia Anim3D Flask por club
+# =============================================================================
+# Uso (Linux con systemd):
+#
+#   1. Copiar este archivo a:
+#        /etc/systemd/system/anim3d-club@.service
+#
+#   2. Para cada club, crear un directorio de instancia con su .env:
+#        /var/www/anim3d/<club>/.env             # generado por nuevo_club.sh
+#        /var/www/anim3d/<club>/backend/         # symlink o copia del backend
+#
+#   3. Habilitar y arrancar el servicio:
+#        sudo systemctl daemon-reload
+#        sudo systemctl enable --now anim3d-club@<club>.service
+#
+#   4. Ver logs:
+#        sudo journalctl -u anim3d-club@<club>.service -f
+#
+# El nombre del club (%i) se usa como:
+#   - Subdirectorio en /var/www/anim3d/%i
+#   - Identificador en logs
+# =============================================================================
+
+[Unit]
+Description=Anim3D Flask backend (club: %i)
+After=network.target mysql.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=anim3d
+Group=anim3d
+
+# Directorio de la instancia (debe contener .env y backend/)
+WorkingDirectory=/var/www/anim3d/%i/backend
+
+# Cargar variables de entorno desde el .env del club
+EnvironmentFile=/var/www/anim3d/%i/.env
+
+# Cada instancia debe tener su propio SALTO_PORT en el .env (5001, 5002, ...)
+# El binario Python debe estar en el venv de la instancia.
+ExecStart=/var/www/anim3d/%i/venv/bin/python app.py
+
+Restart=on-failure
+RestartSec=5s
+
+# Hardening básico
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/anim3d/%i
+
+# Limitar uso de recursos (ajustar según hardware)
+MemoryMax=2G
+CPUQuota=200%
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=anim3d-%i
+
+[Install]
+WantedBy=multi-user.target

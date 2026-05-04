@@ -40,13 +40,18 @@ import mysql.connector
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
-CORS(app, origins=CORS_ORIGINS)
+# Flask-CORS espera lista/string/regex; si CORS_ORIGINS es un Pattern compilado,
+# debe envolverse en lista para que lo trate como regex de origen.
+import re as _re_cors
+_cors_arg = [CORS_ORIGINS] if isinstance(CORS_ORIGINS, _re_cors.Pattern) else CORS_ORIGINS
+CORS(app, origins=_cors_arg)
 
 
 @app.after_request
 def agregar_cabeceras_seguridad(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    # X-Frame-Options omitido a propósito: la política de embedding se gestiona
+    # con Content-Security-Policy: frame-ancestors a nivel de nginx (multi-club).
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response

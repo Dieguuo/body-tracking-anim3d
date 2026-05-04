@@ -5,12 +5,31 @@ import os
 FLASK_PORT: int = int(os.getenv("SALTO_PORT", "5001"))
 
 # Orígenes permitidos para CORS.
-# Usa "*" para entorno local flexible; también admite lista separada por comas.
-_cors_origins_raw = os.getenv("CORS_ORIGINS", "*").strip()
+#
+# Tres modos de configuración (en orden de prioridad):
+#   1. CORS_ORIGINS="*"                    → permite cualquier origen (desarrollo).
+#   2. CORS_ORIGINS="https://a,https://b"  → lista exacta separada por comas.
+#   3. CORS_DOMAIN="tacticalcore.es"       → regex que acepta cualquier subdominio
+#                                             (https://*.tacticalcore.es) + localhost.
+#
+# Por defecto, si no se define ninguna, se usa CORS_DOMAIN=tacticalcore.es.
+import re as _re
+
+_cors_origins_raw = os.getenv("CORS_ORIGINS", "").strip()
+_cors_domain = os.getenv("CORS_DOMAIN", "tacticalcore.es").strip()
+
 if _cors_origins_raw == "*":
     CORS_ORIGINS = "*"
-else:
+elif _cors_origins_raw:
     CORS_ORIGINS = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
+else:
+    # Regex: acepta cualquier subdominio del dominio configurado + localhost (dev).
+    _escaped = _re.escape(_cors_domain)
+    CORS_ORIGINS = _re.compile(
+        rf"^https?://([a-zA-Z0-9-]+\.)?{_escaped}$"
+        rf"|^http://localhost(:\d+)?$"
+        rf"|^http://127\.0\.0\.1(:\d+)?$"
+    )
 
 # Gravedad terrestre (m/s²)
 GRAVEDAD: float = 9.81

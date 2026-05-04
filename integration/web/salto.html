@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medición de Salto</title>
     <link rel="stylesheet" href="css/style.css?v=20260409b">
+    <script>
+        // Integración: el backend Flask se sirve a través de nginx en el mismo origen.
+        window.ANIM3D_CONFIG = { BACKEND_SALTO_URL: window.location.origin };
+    </script>
 </head>
 <body class="salto-page">
     <div id="toast-aviso" class="toast-aviso" aria-live="polite"></div>
