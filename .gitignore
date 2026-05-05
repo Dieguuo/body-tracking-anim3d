@@ -7,19 +7,45 @@ __pycache__/
 # Variables de entorno reales (nunca subir al repo)
 .env
 
-# VS Code
+# Editores / IDE
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # Python build
 *.egg-info/
 dist/
 build/
 
+# Tests / cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
 # Carpetas de uploads (archivos temporales de usuario)
 uploads/
 
-# Certificados locales
+# Certificados y claves (nunca subir al repo)
 certs/
+*.pem
+*.key
+*.crt
+
+# Backups y dumps de base de datos
+*.sql
+*.sql.gz
+*.sqlite
+*.db
+backup*/
+*.bak
+*.tmp
+# Excepción: el esquema versionado del proyecto SÍ se sube
+!scripts/init_db.sql
+
+# Node (por si en el futuro se añade build JS)
+node_modules/
 
 # OS
 Thumbs.db
