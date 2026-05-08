@@ -6,43 +6,79 @@
     <title>Biblioteca de vídeos</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="videos-page">
-    <header class="top-bar">
+<body class="videos-page library-page">
+    <header class="top-bar library-top-bar">
         <a href="index.html" class="back-button"><span class="arrow">←</span> Volver</a>
-        <h1 class="header-title">Biblioteca de vídeos</h1>
+        <div class="library-top-copy">
+            <h1 class="header-title">Biblioteca de vídeos</h1>
+            <p class="library-top-subtitle">Elige el módulo, filtra por usuario y abre cada vídeo en grande.</p>
+        </div>
     </header>
 
-    <main class="videos-layout">
-        <section class="videos-filtros">
-            <label class="pre-camera-label" for="filtro-usuario">Usuario</label>
-            <select id="filtro-usuario" class="modern-input"></select>
-
-            <label class="pre-camera-label" for="filtro-tipo">Tipo de salto</label>
-            <select id="filtro-tipo" class="modern-input">
-                <option value="">Todos</option>
-                <option value="vertical">Vertical</option>
-                <option value="horizontal">Horizontal</option>
-            </select>
-
-            <button id="btn-refrescar-videos" class="sensor-btn secondary-btn" type="button">Actualizar vídeos</button>
-            <p id="videos-estado" class="sensor-nota">Cargando biblioteca...</p>
+    <main class="library-shell">
+        <section class="module-chooser" aria-label="Seleccion de modulo">
+            <button type="button" class="module-option" data-module="salto" id="module-salto">
+                <span class="module-option-kicker">Módulo salto</span>
+                <strong>Saltos</strong>
+                <span>Verticales, horizontales, individuales y comparativas.</span>
+            </button>
+            <button type="button" class="module-option" data-module="futbol" id="module-futbol">
+                <span class="module-option-kicker">Módulo fútbol</span>
+                <strong>Golpeos</strong>
+                <span>Filtra por usuario, individuales y comparativas de 4 tiros.</span>
+            </button>
         </section>
 
-        <section class="videos-seccion">
-            <h2 class="panel-title">Comparativas (grupos de 4)</h2>
-            <div id="comparativas-container" class="videos-grid"></div>
-            <p id="comparativas-empty" class="sensor-nota" style="display:none;">No hay vídeos de comparativa con los filtros actuales.</p>
+        <section class="library-panel">
+            <div class="library-panel-head">
+                <div>
+                    <h2 class="panel-title" id="library-title">Selecciona un módulo</h2>
+                    <p class="library-panel-note" id="library-subtitle">La biblioteca se adapta al módulo elegido arriba.</p>
+                </div>
+                <button id="btn-refrescar-videos" class="sensor-btn secondary-btn" type="button" disabled>Actualizar vídeos</button>
+            </div>
+
+            <form class="library-filters" id="library-filters">
+                <div class="filter-field filter-field-wide">
+                    <label class="pre-camera-label" for="filtro-usuario">Usuario</label>
+                    <select id="filtro-usuario" class="modern-input" disabled></select>
+                </div>
+
+                <div class="filter-field">
+                    <label class="pre-camera-label" for="filtro-categoria">Categoría</label>
+                    <select id="filtro-categoria" class="modern-input" disabled>
+                        <option value="todos">Todos</option>
+                        <option value="individuales">Individuales</option>
+                        <option value="comparativas">Comparativas</option>
+                    </select>
+                </div>
+
+                <div class="filter-field" id="filtro-tipo-salto-wrap">
+                    <label class="pre-camera-label" for="filtro-tipo-salto">Tipo de salto</label>
+                    <select id="filtro-tipo-salto" class="modern-input" disabled>
+                        <option value="todos">Todos</option>
+                        <option value="vertical">Vertical</option>
+                        <option value="horizontal">Horizontal</option>
+                    </select>
+                </div>
+
+                <div class="filter-actions">
+                    <button id="btn-reset-filtros" class="sensor-btn ghost-btn" type="button" disabled>Reset filtros</button>
+                    <p id="videos-estado" class="sensor-nota">Selecciona salto o fútbol para cargar la biblioteca.</p>
+                </div>
+            </form>
         </section>
 
-        <section class="videos-seccion">
-            <h2 class="panel-title">Vídeos individuales</h2>
-            <div id="individuales-container" class="videos-grid"></div>
-            <p id="individuales-empty" class="sensor-nota" style="display:none;">No hay vídeos individuales con los filtros actuales.</p>
+        <section class="library-results">
+            <div id="videos-container" class="gallery-stack"></div>
+            <p id="videos-empty" class="library-empty">Selecciona un módulo para ver los vídeos disponibles.</p>
         </section>
     </main>
 
-    <script src="js/config.js"></script>
-    <script src="js/api-client.js"></script>
-    <script src="js/videos.js"></script>
+    <script src="js/config.js?v=20260507b"></script>
+    <script src="js/api-client.js?v=20260507b"></script>
+    <script src="js/shared/formatters.js?v=20260508a"></script>
+    <script src="js/gallery_helper.js?v=20260508b"></script>
+    <script src="js/videos_galeria.js?v=20260507c"></script>
 </body>
 </html>

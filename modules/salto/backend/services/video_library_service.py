@@ -21,6 +21,8 @@ def _serializar_video(video: dict) -> dict:
         "id_salto": video.get("id_salto"),
         "id_usuario": video.get("id_usuario"),
         "alias": video.get("alias"),
+        "altura_m": float(video["altura_m"]) if video.get("altura_m") is not None else None,
+        "peso_kg": float(video["peso_kg"]) if video.get("peso_kg") is not None else None,
         "tipo_salto": video.get("tipo_salto"),
         "distancia_cm": video.get("distancia_cm"),
         "tiempo_vuelo_s": float(video["tiempo_vuelo_s"]) if video.get("tiempo_vuelo_s") is not None else None,

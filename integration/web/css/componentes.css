@@ -1,0 +1,307 @@
+/* componentes.css
+   Componentes reutilizables: toasts, inputs, tablas, cards y cajas de datos.
+*/
+
+.user-panel {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.toast-aviso {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    z-index: 200;
+    min-width: 240px;
+    max-width: calc(100vw - 2rem);
+    padding: 0.75rem 0.95rem;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.15px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(6px);
+}
+
+.toast-aviso.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.toast-aviso.info { background: rgba(111, 56, 183, 0.92); }
+.toast-aviso.success { background: rgba(41, 168, 120, 0.92); }
+.toast-aviso.warn { background: rgba(196, 128, 40, 0.92); }
+.toast-aviso.error { background: rgba(190, 67, 67, 0.92); }
+
+.modern-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.8rem;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-light);
+    font-weight: 600;
+    font-size: 0.95rem;
+    outline: none;
+    height: 54px;
+}
+
+.modern-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.modern-input option {
+    background: var(--bg-dark);
+    color: var(--text-light);
+}
+
+.panel-title {
+    font-size: 1rem;
+    color: var(--text-light);
+}
+
+.biblioteca-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-size: 0.9rem !important;
+    height: 40px !important;
+    border-radius: 10px !important;
+}
+
+.form-inline-usuario {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+    margin-top: 0.15rem;
+}
+
+.form-actions {
+    display: flex;
+    flex-direction: column;
+    justify-content: stretch;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    margin-top: 0.2rem;
+}
+
+.form-actions .btn-accion {
+    width: 100%;
+    min-width: 0;
+}
+
+.form-actions .btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-light);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: none;
+}
+
+.user-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.85rem;
+    width: 100%;
+}
+
+@media (max-width: 520px) {
+    .user-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.tabla-usuarios-wrapper {
+    max-height: 220px;
+    margin-top: 0.25rem;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.tabla-usuarios {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.tabla-usuarios thead th {
+    position: sticky;
+    top: 0;
+    background: #2f2540;
+    z-index: 2;
+    font-size: 0.8rem;
+    letter-spacing: 0.3px;
+    color: #d8c6ea;
+    text-align: left;
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.tabla-usuarios thead th:last-child,
+.tabla-usuarios td:last-child {
+    text-align: left;
+    width: auto;
+}
+
+.tabla-usuarios td {
+    padding: 0.55rem 0.6rem;
+    font-size: 0.88rem;
+    color: var(--text-light);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tabla-usuarios tr {
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.tabla-usuarios tr:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.tabla-usuarios tr.activo {
+    background: rgba(156, 92, 212, 0.35);
+}
+
+.crud-action-row {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    margin-top: 0.15rem;
+}
+
+.crud-action-row > button:first-child {
+    width: 100%;
+}
+
+.crud-secondary-row {
+    display: flex;
+    gap: 0.8rem;
+    width: 100%;
+}
+
+.crud-secondary-row button {
+    flex: 1;
+    width: 100% !important;
+}
+
+.data-box-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.95rem;
+}
+
+.data-box-row .data-box {
+    min-width: 0;
+}
+
+.technical-data-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    width: 100%;
+    margin-bottom: 0.9rem;
+}
+
+.data-box {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 1rem;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.data-label {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.data-value {
+    color: var(--text-light);
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.comparativa-resumen {
+    width: 100%;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 1rem;
+    margin-bottom: 1.3rem;
+}
+
+.comparativa-resumen p {
+    color: var(--text-light);
+    line-height: 1.45;
+    margin-bottom: 0.5rem;
+}
+
+.comparativa-resumen ul {
+    margin: 0.4rem 0 0.9rem 1.1rem;
+    color: var(--text-light);
+}
+
+.comparativa-resumen li {
+    margin-bottom: 0.3rem;
+}
+
+.comparativa-alias,
+.comparativa-tipo {
+    color: #c897ff;
+    font-weight: 800;
+}
+
+.comparativa-media {
+    color: #59ffc7;
+    font-weight: 900;
+}
+
+.insights-panel {
+    width: 100%;
+    text-align: left;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.insights-title {
+    font-size: 0.9rem;
+    color: #d7b9f3;
+    margin-bottom: 0.4rem;
+}
+
+.insights-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.insights-list li {
+    color: #f1ecf8;
+    font-size: 0.86rem;
+    line-height: 1.35;
+}

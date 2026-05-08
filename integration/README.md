@@ -1,6 +1,6 @@
 # Integración Web y Backends
 
-Esta guía explica cómo levantar la integración completa (frontend + APIs de salto y sensor) en desarrollo local.
+Esta guía explica cómo levantar la integración completa (frontend + APIs de salto, futbol y sensor) en desarrollo local.
 
 ## Opción recomendada (HTTPS)
 
@@ -34,6 +34,13 @@ https://TU_IP_LAN:8443
 
 ```powershell
 cd modules\salto\backend
+python app.py
+```
+
+### Backend futbol
+
+```powershell
+cd modules\futbol\backend
 python app.py
 ```
 
@@ -72,6 +79,7 @@ Importante: los backends arrancan en HTTPS automáticamente si existen los certi
 
 - Si no carga cámara en móvil: usa HTTPS (`https://...`) en lugar de HTTP.
 - Si falla conexión al backend desde frontend: revisa protocolo y puerto (5000 sensor, 5001 salto).
+- Si falla conexión al backend desde frontend: revisa protocolo y puerto (5000 sensor, 5001 salto, 5002 futbol).
 - Si cambias de red y falla HTTPS LAN: regenera certificado con `scripts/generate_cert.py`.
 
 ## Interfaz gráfica

@@ -34,6 +34,19 @@ Móvil (vídeo grabado) → Upload POST → MediaPipe PoseLandmarker → Cálcul
                                                                 MySQL (usuarios + saltos)
 ```
 
+### Módulo futbol (Fase 3 — backend inicial)
+
+```
+Móvil (vídeo grabado) → Upload POST → MediaPipe PoseLandmarker
+                                      │
+                            BiomecánicaService (ángulos)
+                            CalculoService (estabilidad)
+                                      │
+                                Flask API → JSON
+                                      ↕
+                              MySQL (usuarios + golpes_futbol)
+```
+
 ## Capas
 
 | Capa | Tecnología | Responsabilidad |
@@ -50,13 +63,14 @@ Móvil (vídeo grabado) → Upload POST → MediaPipe PoseLandmarker → Cálcul
 ```
 modules/
 ├── sensor/          ← Módulo 1: arduino/ + backend/
-└── salto/           ← Módulo 2: backend/ (MVC + MediaPipe) + mobile/ (futuro)
+├── salto/           ← Módulo 2: backend/ (MVC + MediaPipe) + mobile/ (futuro)
+└── futbol/          ← Módulo 3: backend/ (MVC + MediaPipe)
 
 integration/web/     ← Frontend web unificado (index + salto + sensor)
 scripts/             ← run_all.bat para arrancar todo
 ```
 
-El frontend unificado en `integration/web/` consume ambos backends.
+El frontend unificado en `integration/web/` consume todos los backends.
 Cada módulo expone solo su API REST; no tiene frontend propio.
 
 ## Protocolos en desarrollo (HTTP/HTTPS)
@@ -96,6 +110,26 @@ modules/salto/backend/
     └── video_library_service.py ← Clasificación de vídeos individuales y comparativas (Fase 8.4)
 ```
 
+### Detalle — backend módulo futbol
+
+```
+modules/futbol/backend/
+├── app.py                       ← Flask server (rutas de futbol)
+├── config.py                    ← Constantes + DB_CONFIG + modelo MediaPipe
+├── controllers/
+│   ├── futbol_controller.py     ← Orquesta procesamiento + cálculo
+│   └── futbol_db_controller.py  ← CRUD golpes en BD
+├── models/
+│   ├── db.py                    ← Pool de conexiones MySQL (context manager)
+│   ├── video_processor.py       ← MediaPipe PoseLandmarker — extrae landmarks por frame
+│   └── futbol_model.py          ← Queries tabla golpes_futbol
+├── services/
+│   ├── calculo_service.py       ← Métricas del golpeo (ángulos + estabilidad)
+│   └── biomecanica_service.py   ← Trigonometría pura para ángulos articulares
+└── utils/
+      └── serializers.py           ← Normalización básica de floats
+```
+
 ### Base de datos — `bd_anim3d_saltos`
 
 ```
@@ -115,13 +149,29 @@ usuarios (1) ──────< (N) saltos
 
 Relación 1:N con `ON DELETE CASCADE`: al eliminar un usuario se eliminan todos sus saltos.
 
+### Tabla `golpes_futbol`
+
+```
+usuarios (1) ──────< (N) golpes_futbol
+      id_usuario PK            id_golpeo PK
+                                                       id_usuario FK → usuarios
+                                                       angulo_cadera_deg FLOAT
+                                                       angulo_rodilla_deg FLOAT
+                                                       angulo_tobillo_deg FLOAT
+                                                       estabilidad_tronco FLOAT
+                                                       pierna_golpeo VARCHAR(20)
+                                                       pierna_apoyo VARCHAR(20)
+                                                       confianza FLOAT
+                                                       fecha_golpeo DATETIME
+```
+
 ## Principios aplicados
 
 - **MVC** en el backend Python: modelo (serial/vídeo), vista (consola), controlador (flujo), servicio (cálculos puros).
 - **Separación de responsabilidades**: el dispositivo no conoce el backend; el backend no conoce el frontend.
 - **Modularidad**: cada funcionalidad vive en `modules/<nombre>/` con arduino/mobile, backend y frontend propios.
 - **Autonomía de módulo**: cada módulo puede arrancarse y probarse de forma independiente.
-- **Puertos independientes**: cada módulo corre en su propio puerto (sensor → 5000, salto → 5001).
+- **Puertos independientes**: cada módulo corre en su propio puerto (sensor → 5000, salto → 5001, futbol → 5002).
 
 ## Visualización 3D — flujo de datos
 

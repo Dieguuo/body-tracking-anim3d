@@ -2,6 +2,7 @@
 REM ══════════════════════════════════════════════════════
 REM  Arranca todo el proyecto con un solo doble-clic:
 REM    - Backend Salto    (puerto 5001)
+REM    - Backend Futbol   (puerto 5002)
 REM    - Backend Sensor   (puerto 5000)  [opcional]
 REM    - Frontend web     (HTTPS puerto 8443)
 REM ══════════════════════════════════════════════════════
@@ -55,15 +56,19 @@ echo  === Jump Tracker - Iniciando servicios ===
 echo.
 
 REM 1) Backend del salto (puerto 5001)
-echo  [1/3] Backend Salto (puerto 5001)...
-start "Backend Salto" cmd /k "cd /d %PROJECT_ROOT%\modules\salto\backend && set CORS_ORIGINS=https://localhost:8443,https://127.0.0.1:8443,http://localhost:8080,http://127.0.0.1:8080 && "%VENV_PYTHON%" app.py"
+echo  [1/4] Backend Salto (puerto 5001)...
+start "Backend Salto" cmd /k "cd /d %PROJECT_ROOT%\modules\salto\backend && set CORS_ORIGINS=* && "%VENV_PYTHON%" app.py"
 
-REM 2) Backend del sensor (puerto 5000) — no falla si no hay Arduino
-echo  [2/3] Backend Sensor (puerto 5000)...
-start "Backend Sensor" cmd /k "cd /d %PROJECT_ROOT%\modules\sensor\backend && set CORS_ORIGINS=https://localhost:8443,https://127.0.0.1:8443,http://localhost:8080,http://127.0.0.1:8080 && "%VENV_PYTHON%" app.py"
+REM 2) Backend del futbol (puerto 5002)
+echo  [2/4] Backend Futbol (puerto 5002)...
+start "Backend Futbol" cmd /k "cd /d %PROJECT_ROOT%\modules\futbol\backend && set CORS_ORIGINS=* && "%VENV_PYTHON%" app.py"
 
-REM 3) Frontend web HTTPS (puerto 8443)
-echo  [3/3] Frontend web HTTPS (puerto 8443)...
+REM 3) Backend del sensor (puerto 5000) — no falla si no hay Arduino
+echo  [3/4] Backend Sensor (puerto 5000)...
+start "Backend Sensor" cmd /k "cd /d %PROJECT_ROOT%\modules\sensor\backend && set CORS_ORIGINS=* && "%VENV_PYTHON%" app.py"
+
+REM 4) Frontend web HTTPS (puerto 8443)
+echo  [4/4] Frontend web HTTPS (puerto 8443)...
 start "Frontend Web HTTPS" cmd /k "cd /d %PROJECT_ROOT% && "%VENV_PYTHON%" scripts\https_server.py"
 
 echo.

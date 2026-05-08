@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medición de Salto</title>
-    <link rel="stylesheet" href="css/style.css?v=20260409b">
+    <link rel="stylesheet" href="css/style.css?v=20260507b">
 </head>
 <body class="salto-page">
     <div id="toast-aviso" class="toast-aviso" aria-live="polite"></div>
@@ -25,6 +25,10 @@
     <main class="camera-wrapper">
         <div id="indicador-ia">Cargando Motor...</div>
         <div id="comparativa-progreso" class="comparativa-progreso" style="display: none;"></div>
+        <div id="alerta-orientacion" class="alerta-orientacion" aria-live="assertive" role="alert" style="display:none;">
+            <div class="orientacion-icono">&#x21BB;</div>
+            <p class="orientacion-texto">Gira el dispositivo a horizontal para analizar</p>
+        </div>
         
         <video id="vista-camara" autoplay playsinline muted></video>
         
@@ -94,12 +98,14 @@
                 <input type="text" id="nuevo-nombre" class="modern-input" placeholder="Nombre completo" maxlength="120">
                 <input type="number" id="nuevo-altura" class="modern-input" placeholder="Altura (1.75)" step="0.01" min="0.5" max="2.5">
                 <input type="number" id="nuevo-peso" class="modern-input" placeholder="Peso kg (opcional)" step="0.1" min="20" max="300">
-                <button id="btn-crear-usuario-inline" class="sensor-btn secondary-btn" type="button">Crear usuario</button>
-                <button id="btn-cancelar-edicion" class="sensor-btn ghost-btn" type="button" style="display:none;">Cancelar edición</button>
+                <div class="form-actions">
+                    <button id="btn-crear-usuario-inline" class="btn-accion" type="button">Guardar usuario</button>
+                    <button id="btn-cancelar-edicion" class="btn-accion btn-secondary" type="button" style="display:none;">Cancelar edición</button>
+                </div>
             </div>
 
             <div id="usuario-estado" class="sensor-nota">Sin usuario activo.</div>
-            <a href="videos.html" class="sensor-btn secondary-btn biblioteca-link">Abrir biblioteca de vídeos</a>
+            <a href="videos.html?module=salto" class="sensor-btn secondary-btn biblioteca-link">Abrir biblioteca de vídeos</a>
 
             <div class="analitica-panel">
                 <div class="analitica-header">
@@ -413,11 +419,12 @@
         </div>
     </div>
 
-    <script src="js/config.js?v=20260409b"></script>
-    <script src="js/api-client.js?v=20260409b"></script>
-    <script src="js/camara.js?v=20260409b"></script>
-    <script src="js/registro.js?v=20260409b"></script>
+    <script src="js/config.js?v=20260507b"></script>
+    <script src="js/api-client.js?v=20260507b"></script>
+    <script src="js/usuario_activo.js?v=20260507b"></script>
+    <script src="js/camara.js?v=20260507b"></script>
+    <script src="js/registro.js?v=20260507b"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
-    <script type="module" src="js/api_salto.js?v=20260409b"></script>
+    <script type="module" src="js/api_salto.js?v=20260507b"></script>
 </body>
 </html>

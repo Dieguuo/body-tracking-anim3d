@@ -7,3 +7,6 @@ numpy
 mysql-connector-python
 python-dotenv
 cryptography
+pytest
+pytest-cov
+flask-limiter

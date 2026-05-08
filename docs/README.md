@@ -7,6 +7,11 @@
 | [fases_proyecto.md](fases_proyecto.md) | Estado de cada fase del proyecto |
 | [decisiones_tecnicas.md](decisiones_tecnicas.md) | Justificaciones de diseño (hilos, locks, parseo, MVC, BD, reglas de negocio) |
 | [manual_usuario.md](manual_usuario.md) | Guía de uso de la app, incluyendo API REST (usuarios, saltos, comparativa) |
+| [futbol.md](futbol.md) | Detalle del módulo futbol, métricas y endpoints |
+| [../modules/futbol/ANALITICA_AVANZADA.md](../modules/futbol/ANALITICA_AVANZADA.md) | Documento de referencia de la extensión analítica del módulo futbol (10 fases) |
 | [historial_tecnico_2026-04-13.md](historial_tecnico_2026-04-13.md) | Bitácora técnica del día: regresiones, causas y fixes aplicados |
+| [historial_tecnico_2026-05-04.md](historial_tecnico_2026-05-04.md) | Bitácora técnica del día: módulo futbol y usuarios |
+| [historial_tecnico_2026-05-05.md](historial_tecnico_2026-05-05.md) | Bitácora técnica del día: analítica avanzada futbol + landmarks cliente |
 | [checklist_validacion_salto_vh_realtime_galeria.md](checklist_validacion_salto_vh_realtime_galeria.md) | Plan de pruebas funcional para vertical/horizontal y realtime/galería |
 | [entrega_cambios_2026-04-13.md](entrega_cambios_2026-04-13.md) | Documento de traspaso completo con todo lo nuevo y todo lo modificado |
+| [entrega_cambios_2026-05-04.md](entrega_cambios_2026-05-04.md) | Documento de traspaso: usuarios y biblioteca de futbol |

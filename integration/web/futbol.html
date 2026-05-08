@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analizador de golpeo</title>
+    <link rel="stylesheet" href="css/style.css?v=20260508b">
+</head>
+<body class="futbol-page">
+    <div id="toast-aviso" class="toast-aviso" aria-live="polite"></div>
+
+    <header class="top-bar">
+        <a href="index.html" class="back-button"><span class="arrow">←</span> Volver</a>
+        <h1 class="header-title">Analizador de golpeo</h1>
+    </header>
+
+    <section class="pre-camera-controls">
+        <label for="modo-analisis" class="pre-camera-label">Modo</label>
+        <select id="modo-analisis" class="modern-input">
+            <option value="individual" selected>Tiro individual</option>
+            <option value="comparativa">Tiros comparativa (4 tiros)</option>
+        </select>
+        <label for="modo-grabacion" class="pre-camera-label">Modo de grabacion</label>
+        <select id="modo-grabacion" class="modern-input">
+            <option value="vertical" selected>Vertical</option>
+            <option value="horizontal">Horizontal</option>
+        </select>
+        <p class="sensor-nota">En modo comparativa, el sistema agrupa 4 tiros consecutivos de la misma sesión y muestra la tabla de comparación.</p>
+    </section>
+
+    <main class="camera-wrapper">
+        <div id="indicador-ia">Cargando Motor...</div>
+        <div id="comparativa-progreso" class="comparativa-progreso" style="display:none;"></div>
+        <video id="vista-camara" autoplay playsinline muted></video>
+        <canvas id="canvas-esqueleto"></canvas>
+    </main>
+
+    <section class="capture-strip">
+        <div class="record-choice">
+            <span class="choice-label">Guardar video en BD?</span>
+            <label><input type="radio" name="guardar-video-tiempo-real" value="si"> Si, guardar video + datos</label>
+            <label><input type="radio" name="guardar-video-tiempo-real" value="no" checked> No, solo guardar datos</label>
+        </div>
+        <button id="btn-grabar" class="record-btn primary-capture-btn">
+            <span class="record-icon"></span>
+            <span id="btn-text">Iniciar grabacion</span>
+        </button>
+    </section>
+
+    <section class="camera-hud">
+        <div class="upload-container upload-separator-only">
+            <span class="divider">o</span>
+            <div class="upload-btn-visual" id="label-visual">Subir video de la galeria</div>
+            <input type="file" id="input-archivo-final" accept="video/mp4,video/webm,video/quicktime,video/*" class="input-transparente">
+        </div>
+
+        <div class="user-panel">
+            <h2 class="panel-title">Registro del golpeo</h2>
+            <p class="sensor-nota">Selecciona o crea un usuario para guardar los resultados.</p>
+
+            <input type="text" id="buscar-usuario" class="modern-input" placeholder="Buscar usuario...">
+
+            <div class="tabla-usuarios-wrapper" id="tabla-usuarios-wrapper">
+                <table class="tabla-usuarios">
+                    <thead>
+                        <tr>
+                            <th>Alias</th>
+                            <th>Nombre</th>
+                            <th>Altura</th>
+                            <th>Peso</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-usuarios-body"></tbody>
+                </table>
+                <div id="usuarios-loading" class="sensor-nota">Cargando usuarios...</div>
+                <div id="usuarios-empty" class="sensor-nota" style="display: none;">No hay usuarios para mostrar.</div>
+            </div>
+
+            <div class="crud-action-row">
+                <button id="btn-refrescar-usuarios" class="sensor-btn secondary-btn" type="button">Actualizar lista</button>
+                <div class="crud-secondary-row">
+                    <button id="btn-editar-usuario" class="sensor-btn secondary-btn" type="button">Editar</button>
+                    <button id="btn-eliminar-usuario" class="sensor-btn danger-btn" type="button">Eliminar</button>
+                </div>
+            </div>
+
+            <div class="user-form-grid">
+                <input type="text" id="form-alias" class="modern-input" placeholder="Alias" required maxlength="50">
+                <input type="text" id="form-nombre" class="modern-input" placeholder="Nombre completo" required maxlength="120">
+            </div>
+            <div class="user-form-grid">
+                <input type="number" id="form-altura" class="modern-input" placeholder="Altura en metros (Ej: 1.75)" required step="0.01" min="0.50" max="2.50">
+                <input type="number" id="form-peso" class="modern-input" placeholder="Peso en kg (opcional)" step="0.1" min="20" max="300">
+            </div>
+            <p class="sensor-nota">Completa alias, nombre, altura y peso para mantener datos coherentes entre modulos.</p>
+            <div class="form-actions">
+                <button id="btn-guardar-usuario" class="btn-accion">Guardar usuario</button>
+                <button id="btn-cancelar-edicion" class="btn-accion btn-secondary" style="display: none;">Cancelar</button>
+            </div>
+        </div>
+
+        <div id="usuario-estado" class="sensor-nota">Sin usuario activo.</div>
+        <a href="videos.html?module=futbol" class="sensor-btn secondary-btn biblioteca-link">Abrir biblioteca de videos</a>
+
+        <h2 class="panel-title">Resultados del golpeo</h2>
+        <p class="sensor-nota">Graba o sube un video para obtener las metricas.</p>
+
+        <div class="technical-data-grid" id="futbol-metricas">
+            <div class="data-box">
+                <span class="data-label">Pierna apoyo</span>
+                <span id="data-pierna-apoyo" class="data-value">--</span>
+            </div>
+            <div class="data-box">
+                <span class="data-label">Pierna golpeo</span>
+                <span id="data-pierna-golpeo" class="data-value">--</span>
+            </div>
+            <div class="data-box">
+                <span class="data-label">Ang. Cadera</span>
+                <span id="data-angulo-cadera" class="data-value">-- deg</span>
+            </div>
+            <div class="data-box">
+                <span class="data-label">Ang. Rodilla</span>
+                <span id="data-angulo-rodilla" class="data-value">-- deg</span>
+            </div>
+            <div class="data-box">
+                <span class="data-label">Ang. Tobillo</span>
+                <span id="data-angulo-tobillo" class="data-value">-- deg</span>
+            </div>
+            <div class="data-box">
+                <span class="data-label">Estabilidad</span>
+                <span id="data-estabilidad" class="data-value">--</span>
+            </div>
+            <div class="data-box">
+                <span class="data-label">Confianza</span>
+                <span id="data-confianza" class="data-value">--</span>
+            </div>
+            <div class="data-box">
+                <span class="data-label">Vel. pie (m/s)</span>
+                <span id="data-velocidad-pie" class="data-value">--</span>
+            </div>
+            <div class="data-box">
+                <span class="data-label">Frame impacto</span>
+                <span id="data-frame-impacto" class="data-value">--</span>
+            </div>
+            <div class="data-box">
+                <span class="data-label">Asimetría (%)</span>
+                <span id="data-asimetria" class="data-value">--</span>
+            </div>
+            <div class="data-box">
+                <span class="data-label">Apoyo (score)</span>
+                <span id="data-apoyo-score" class="data-value">--</span>
+            </div>
+            <div class="data-box">
+                <span class="data-label">Clasificación</span>
+                <span id="data-clasificacion" class="data-value">--</span>
+            </div>
+        </div>
+
+        <div id="panel-fases" class="panel-fases" style="display:none;">
+            <h3 class="panel-title">Fases del gesto</h3>
+            <ul id="lista-fases" class="lista-fases"></ul>
+        </div>
+
+        <div id="panel-alertas" class="panel-alertas" style="display:none;">
+            <h3 class="panel-title">Alertas y observaciones</h3>
+            <ul id="lista-alertas" class="lista-alertas"></ul>
+            <ul id="lista-observaciones" class="lista-observaciones"></ul>
+        </div>
+
+        <div id="panel-curvas" class="panel-curvas" style="display:none;">
+            <h3 class="panel-title">Curvas angulares (cadera / rodilla / tobillo)</h3>
+            <canvas id="grafico-curvas" height="220"></canvas>
+        </div>
+
+        <div id="panel-velocidades" class="panel-curvas" style="display:none;">
+            <h3 class="panel-title">Velocidades articulares (°/s)</h3>
+            <canvas id="grafico-velocidades" height="220"></canvas>
+        </div>
+
+        <div id="panel-analitica" class="panel-analitica" style="display:none;">
+            <h3 class="panel-title">Analítica del jugador</h3>
+            <div class="data-box-row">
+                <div class="data-box">
+                    <span class="data-label">Fatiga sesión</span>
+                    <span id="data-fatiga" class="data-value">--</span>
+                </div>
+                <div class="data-box">
+                    <span class="data-label">Tendencia</span>
+                    <span id="data-tendencia" class="data-value">--</span>
+                </div>
+            </div>
+            <canvas id="grafico-tendencia" height="200"></canvas>
+            <h4 class="panel-subtitle">Comparativa últimas 4 ejecuciones</h4>
+            <div class="comparativa-wrapper">
+                <table class="tabla-comparativa">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Fecha</th>
+                            <th>Vel. (m/s)</th>
+                            <th>Cadera</th>
+                            <th>Rodilla</th>
+                            <th>Tobillo</th>
+                            <th>Estab.</th>
+                            <th>Clasif.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-comparativa"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="panel-comparativa-sesion" class="panel-comparativa-sesion" style="display:none;">
+            <h3 class="panel-title">Comparativa de sesión (4 tiros)</h3>
+            <p class="sensor-nota">La tabla resume los últimos 4 tiros de la sesión comparativa y destaca el mejor score compuesto.</p>
+            <div class="comparativa-wrapper">
+                <table class="tabla-comparativa">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Score</th>
+                            <th>Vel. (m/s)</th>
+                            <th>Estab.</th>
+                            <th>Cadera</th>
+                            <th>Rodilla</th>
+                            <th>Tobillo</th>
+                            <th>Clasif.</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-comparativa-sesion"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="panel-acciones" class="panel-acciones" style="display:none;">
+            <button id="btn-video-anotado" class="sensor-btn primary-btn" type="button">
+                Generar vídeo anotado
+            </button>
+            <video id="video-anotado-player" controls style="display:none; width:100%; margin-top:12px;"></video>
+            <div id="preview-landmarks" class="preview-landmarks" style="display:none;">
+                <h3 class="panel-title">Reproduccion con landmarks</h3>
+                <div class="preview-video-wrap">
+                    <video id="preview-video" class="preview-video" controls></video>
+                    <canvas id="preview-canvas" class="preview-canvas"></canvas>
+                </div>
+                <p class="sensor-nota">Overlay en vivo con pose y balon (heuristica). Puede variar segun luz y fondo.</p>
+            </div>
+        </div>
+    </section>
+
+    <script src="js/config.js?v=20260507b"></script>
+    <script src="js/shared/formatters.js?v=20260508a"></script>
+    <script src="js/usuario_activo.js?v=20260507b"></script>
+    <script src="js/futbol_controls.js?v=20260508b"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="js/api-client.js?v=20260507b"></script>
+    <script src="js/api_futbol.js?v=20260508b"></script>
+    <script src="js/registro_futbol.js?v=20260507b"></script>
+    <script src="js/futbol.js?v=20260508b"></script>
+    <script type="module" src="js/futbol_landmarks.js?v=20260507b"></script>
+</body>
+</html>

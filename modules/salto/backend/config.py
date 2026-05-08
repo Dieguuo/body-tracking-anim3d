@@ -60,7 +60,7 @@ DB_CONFIG = {
     "host": os.getenv("DB_HOST", "localhost"),
     "user": os.getenv("DB_USER", "root"),
     "password": _db_password,
-    "database": os.getenv("DB_NAME", "bd_anim3d_saltos"),
+    "database": os.getenv("DB_NAME", "bd_anim3d"),
     "charset": "utf8mb4",
     "collation": "utf8mb4_unicode_ci",
 }

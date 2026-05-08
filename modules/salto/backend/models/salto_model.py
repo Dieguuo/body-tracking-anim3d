@@ -1,5 +1,15 @@
 """
-MODELO — Acceso a datos de la tabla `saltos`.
+MODELO — Acceso a datos de saltos sobre el esquema unificado bd_anim3d.
+
+El esquema unificado almacena cada salto como:
+  - gestos          (cabecera comun, modulo='salto')
+  - gestos_salto    (especializacion: distancia, angulos, etc.)
+  - gestos_curvas   (curvas y landmarks; opcional)
+  - gestos_videos   (BLOB del video; opcional)
+
+Para minimizar el cambio en analitica y controllers, las lecturas
+usan la vista `v_saltos`, que reproduce las columnas historicas
+(id_salto, fecha_salto, ...).
 """
 
 import json
@@ -9,215 +19,176 @@ import mysql.connector
 from models.db import get_connection
 
 
+# Campos expuestos por la vista v_saltos en orden estable.
+_CAMPOS_VSALTOS = (
+    "id_salto, id_usuario, id_sesion, tipo_salto, distancia_cm, "
+    "tiempo_vuelo_s, confianza_ia, metodo_origen, fecha_salto, "
+    "potencia_w, asimetria_pct, angulo_rodilla_deg, angulo_cadera_deg, "
+    "estabilidad_aterrizaje"
+)
+
+
 class SaltoModel:
-    """CRUD para la tabla saltos."""
+    """CRUD de saltos sobre el esquema unificado (gestos + gestos_salto)."""
 
-    _cache_columnas: dict[str, bool] = {}
-
-    @classmethod
-    def _tiene_columna(cls, cur, tabla: str, columna: str) -> bool:
-        key = f"{tabla}.{columna}"
-        if key in cls._cache_columnas:
-            return cls._cache_columnas[key]
-
+    # ── Helpers internos ────────────────────────────────────────
+    @staticmethod
+    def _curvas_por_id(cur, id_salto: int) -> dict | None:
         cur.execute(
-            "SELECT COUNT(*) AS total "
-            "FROM INFORMATION_SCHEMA.COLUMNS "
-            "WHERE TABLE_SCHEMA = DATABASE() "
-            "AND TABLE_NAME = %s "
-            "AND COLUMN_NAME = %s",
-            (tabla, columna),
+            "SELECT curvas_json FROM gestos_curvas WHERE id_gesto = %s",
+            (id_salto,),
         )
-        row = cur.fetchone() or {"total": 0}
-        cls._cache_columnas[key] = int(row.get("total", 0)) > 0
-        return cls._cache_columnas[key]
+        row = cur.fetchone()
+        if not row:
+            return None
+        raw = row.get("curvas_json")
+        if raw is None:
+            return None
+        if isinstance(raw, (bytes, bytearray)):
+            raw = raw.decode("utf-8", errors="ignore")
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                return None
+        return raw
 
-    @classmethod
-    def _expr_col(cls, cur, tabla_alias: str, tabla_real: str, columna: str, alias: str | None = None) -> str:
-        out_alias = alias or columna
-        if cls._tiene_columna(cur, tabla_real, columna):
-            return f"{tabla_alias}.{columna} AS {out_alias}"
-        return f"NULL AS {out_alias}"
-
-    @classmethod
-    def _campos_saltos_select(cls, cur, alias: str = "s") -> str:
-        base = [
-            f"{alias}.id_salto",
-            f"{alias}.id_usuario",
-            f"{alias}.tipo_salto",
-            f"{alias}.distancia_cm",
-            f"{alias}.tiempo_vuelo_s",
-            f"{alias}.confianza_ia",
-            f"{alias}.metodo_origen",
-            f"{alias}.fecha_salto",
-        ]
-        extras = [
-            cls._expr_col(cur, alias, "saltos", "potencia_w"),
-            cls._expr_col(cur, alias, "saltos", "asimetria_pct"),
-            cls._expr_col(cur, alias, "saltos", "angulo_rodilla_deg"),
-            cls._expr_col(cur, alias, "saltos", "angulo_cadera_deg"),
-            cls._expr_col(cur, alias, "saltos", "estabilidad_aterrizaje"),
-        ]
-
-        if cls._tiene_columna(cur, "saltos", "curvas_json"):
-            extras.append(f"JSON_REMOVE({alias}.curvas_json, '$.landmarks_frames') AS curvas_json")
-        else:
-            extras.append("NULL AS curvas_json")
-
-        return ", ".join(base + extras)
-
-    def obtener_videos_guardados(
-        self,
-        id_usuario: int | None = None,
-        tipo_salto: str | None = None,
-    ) -> list[dict]:
-        """Lista metadatos de saltos que tienen vídeo almacenado en BD."""
-        params: list = []
-        where = ["s.video_blob IS NOT NULL"]
-
-        if id_usuario is not None:
-            where.append("s.id_usuario = %s")
-            params.append(id_usuario)
-
-        if tipo_salto:
-            where.append("s.tipo_salto = %s")
-            params.append(tipo_salto)
-
-        sql = (
-            "SELECT s.id_salto, s.id_usuario, u.alias, s.tipo_salto, s.distancia_cm, "
-            "s.tiempo_vuelo_s, s.metodo_origen, s.fecha_salto, s.video_nombre, s.video_mime, "
-            "LENGTH(s.video_blob) AS tamano_bytes "
-            "FROM saltos s "
-            "INNER JOIN usuarios u ON u.id_usuario = s.id_usuario "
-            f"WHERE {' AND '.join(where)} "
-            "ORDER BY s.fecha_salto DESC"
-        )
-
+    @staticmethod
+    def _adjuntar_curvas(rows: list[dict]) -> list[dict]:
+        """Anade campo `curvas_json` (sin landmarks_frames) a cada fila."""
+        if not rows:
+            return rows
+        ids = [r["id_salto"] for r in rows if r.get("id_salto") is not None]
+        if not ids:
+            return rows
         with get_connection() as (conn, cur):
-            cur.execute(sql, tuple(params))
-            return cur.fetchall()
-
-    def obtener_video_por_id_salto(self, id_salto: int) -> dict | None:
-        """Devuelve metadatos y blob de vídeo para reproducir en streaming."""
-        with get_connection() as (conn, cur):
+            placeholders = ",".join(["%s"] * len(ids))
             cur.execute(
-                "SELECT id_salto, id_usuario, tipo_salto, fecha_salto, video_nombre, video_mime, video_blob "
-                "FROM saltos WHERE id_salto = %s AND video_blob IS NOT NULL",
-                (id_salto,),
+                f"SELECT id_gesto, JSON_REMOVE(curvas_json, '$.landmarks_frames') AS curvas_json "
+                f"FROM gestos_curvas WHERE id_gesto IN ({placeholders})",
+                tuple(ids),
             )
-            return cur.fetchone()
+            mapa = {row["id_gesto"]: row.get("curvas_json") for row in cur.fetchall()}
+        for r in rows:
+            r["curvas_json"] = mapa.get(r["id_salto"])
+        return rows
 
-    def guardar_video_bd(
-        self,
-        id_salto: int,
-        video_bytes: bytes,
-        video_nombre: str | None,
-        video_mime: str | None,
-    ) -> bool:
-        """
-        Guarda el vídeo asociado a un salto en la tabla `saltos`.
-
-        Las columnas video_blob, video_nombre, video_mime deben existir
-        en la tabla (ver scripts/init_db.sql).
-        """
-        if not video_bytes:
-            return False
-
-        try:
-            with get_connection() as (conn, cur):
-                cur.execute(
-                    "UPDATE saltos "
-                    "SET video_blob = %s, video_nombre = %s, video_mime = %s "
-                    "WHERE id_salto = %s",
-                    (video_bytes, video_nombre, video_mime, id_salto),
-                )
-                return cur.rowcount > 0
-        except mysql.connector.Error as exc:
-            logging.getLogger(__name__).warning("guardar_video_bd falló: %s", exc)
-            return False
-
+    # ── Lecturas ────────────────────────────────────────────────
     def obtener_todos(self) -> list[dict]:
         with get_connection() as (conn, cur):
-            campos = self._campos_saltos_select(cur, alias="s")
             cur.execute(
-                f"SELECT {campos} FROM saltos s ORDER BY s.fecha_salto DESC"
+                f"SELECT {_CAMPOS_VSALTOS} FROM v_saltos ORDER BY fecha_salto DESC"
             )
-            return cur.fetchall()
+            rows = cur.fetchall()
+        return self._adjuntar_curvas(rows)
 
     def obtener_por_id(self, id_salto: int) -> dict | None:
         with get_connection() as (conn, cur):
-            campos = self._campos_saltos_select(cur, alias="s")
             cur.execute(
-                f"SELECT {campos} FROM saltos s WHERE s.id_salto = %s",
+                f"SELECT {_CAMPOS_VSALTOS} FROM v_saltos WHERE id_salto = %s",
                 (id_salto,),
             )
-            return cur.fetchone()
+            row = cur.fetchone()
+        if row:
+            self._adjuntar_curvas([row])
+        return row
 
     def obtener_por_usuario(self, id_usuario: int) -> list[dict]:
         with get_connection() as (conn, cur):
-            campos = self._campos_saltos_select(cur, alias="s")
             cur.execute(
-                f"SELECT {campos} FROM saltos s "
-                "WHERE s.id_usuario = %s ORDER BY s.fecha_salto DESC",
+                f"SELECT {_CAMPOS_VSALTOS} FROM v_saltos "
+                "WHERE id_usuario = %s ORDER BY fecha_salto DESC",
                 (id_usuario,),
             )
-            return cur.fetchall()
+            rows = cur.fetchall()
+        return self._adjuntar_curvas(rows)
+
+    def obtener_por_usuario_y_tipo(self, id_usuario: int, tipo_salto: str) -> list[dict]:
+        with get_connection() as (conn, cur):
+            cur.execute(
+                f"SELECT {_CAMPOS_VSALTOS} FROM v_saltos "
+                "WHERE id_usuario = %s AND tipo_salto = %s "
+                "ORDER BY fecha_salto ASC",
+                (id_usuario, tipo_salto),
+            )
+            rows = cur.fetchall()
+        return self._adjuntar_curvas(rows)
+
+    def contar_por_tipo(self, id_usuario: int) -> dict[str, int]:
+        with get_connection() as (conn, cur):
+            cur.execute(
+                "SELECT tipo_salto, COUNT(*) AS total "
+                "FROM v_saltos WHERE id_usuario = %s GROUP BY tipo_salto",
+                (id_usuario,),
+            )
+            rows = cur.fetchall()
+        resultado = {"vertical": 0, "horizontal": 0}
+        for r in rows:
+            resultado[r["tipo_salto"]] = r["total"]
+        return resultado
 
     def obtener_curvas_por_id(self, id_salto: int) -> dict | None:
-        """Devuelve solo las curvas angulares almacenadas para un salto."""
         with get_connection() as (conn, cur):
-            if not self._tiene_columna(cur, "saltos", "curvas_json"):
-                return None
-            cur.execute(
-                "SELECT id_salto, curvas_json FROM saltos WHERE id_salto = %s",
-                (id_salto,),
-            )
-            row = cur.fetchone()
-            if not row:
-                return None
-            raw = row.get("curvas_json")
-            if raw and isinstance(raw, str):
-                row["curvas_json"] = json.loads(raw)
-            return row
+            curvas = self._curvas_por_id(cur, id_salto)
+        if curvas is None:
+            return None
+        return {"id_salto": id_salto, "curvas_json": curvas}
 
     def obtener_landmarks_por_id(self, id_salto: int) -> dict | None:
-        """Devuelve landmarks frame a frame almacenados en curvas_json."""
         with get_connection() as (conn, cur):
-            if not self._tiene_columna(cur, "saltos", "curvas_json"):
-                return None
+            curvas = self._curvas_por_id(cur, id_salto)
+        if not isinstance(curvas, dict):
+            return None
+        frames = curvas.get("landmarks_frames")
+        if not isinstance(frames, list) or len(frames) == 0:
+            return None
+        return {
+            "id_salto": id_salto,
+            "total_frames": len(frames),
+            "frames": frames,
+        }
 
-            cur.execute(
-                "SELECT id_salto, curvas_json FROM saltos WHERE id_salto = %s",
-                (id_salto,),
+    def obtener_historial_analitica_usuario(
+        self, id_usuario: int, tipo_salto: str | None = None
+    ) -> list[dict]:
+        with get_connection() as (conn, cur):
+            sql = (
+                f"SELECT s.{', s.'.join(_CAMPOS_VSALTOS.split(', '))}, "
+                "u.peso_kg, u.alias "
+                "FROM v_saltos s "
+                "INNER JOIN usuarios u ON u.id_usuario = s.id_usuario "
+                "WHERE s.id_usuario = %s"
             )
-            row = cur.fetchone()
-            if not row:
-                return None
+            params: list = [id_usuario]
+            if tipo_salto:
+                sql += " AND s.tipo_salto = %s"
+                params.append(tipo_salto)
+            sql += " ORDER BY s.fecha_salto ASC"
+            cur.execute(sql, tuple(params))
+            rows = cur.fetchall()
+        return self._adjuntar_curvas(rows)
 
-            raw = row.get("curvas_json")
-            if not raw:
-                return None
+    def obtener_historial_analitica_global(
+        self, tipo_salto: str | None = None
+    ) -> list[dict]:
+        with get_connection() as (conn, cur):
+            sql = (
+                f"SELECT s.{', s.'.join(_CAMPOS_VSALTOS.split(', '))}, "
+                "u.peso_kg, u.alias "
+                "FROM v_saltos s "
+                "INNER JOIN usuarios u ON u.id_usuario = s.id_usuario "
+                "WHERE 1 = 1"
+            )
+            params: list = []
+            if tipo_salto:
+                sql += " AND s.tipo_salto = %s"
+                params.append(tipo_salto)
+            sql += " ORDER BY s.fecha_salto ASC"
+            cur.execute(sql, tuple(params))
+            rows = cur.fetchall()
+        return self._adjuntar_curvas(rows)
 
-            curvas = raw
-            if isinstance(raw, str):
-                try:
-                    curvas = json.loads(raw)
-                except json.JSONDecodeError:
-                    return None
-
-            if not isinstance(curvas, dict):
-                return None
-
-            frames = curvas.get("landmarks_frames")
-            if not isinstance(frames, list) or len(frames) == 0:
-                return None
-
-            return {
-                "id_salto": id_salto,
-                "total_frames": len(frames),
-                "frames": frames,
-            }
-
+    # ── Escrituras ──────────────────────────────────────────────
     def crear(
         self,
         id_usuario: int,
@@ -234,60 +205,38 @@ class SaltoModel:
         curvas_json: dict | None = None,
     ) -> int:
         with get_connection() as (conn, cur):
-            columnas = ["id_usuario", "tipo_salto", "distancia_cm", "tiempo_vuelo_s", "confianza_ia", "metodo_origen"]
-            valores = [id_usuario, tipo_salto, distancia_cm, tiempo_vuelo_s, confianza_ia, metodo_origen]
-
-            if self._tiene_columna(cur, "saltos", "potencia_w"):
-                columnas.append("potencia_w")
-                valores.append(potencia_w)
-            if self._tiene_columna(cur, "saltos", "asimetria_pct"):
-                columnas.append("asimetria_pct")
-                valores.append(asimetria_pct)
-            if self._tiene_columna(cur, "saltos", "angulo_rodilla_deg"):
-                columnas.append("angulo_rodilla_deg")
-                valores.append(angulo_rodilla_deg)
-            if self._tiene_columna(cur, "saltos", "angulo_cadera_deg"):
-                columnas.append("angulo_cadera_deg")
-                valores.append(angulo_cadera_deg)
-            if self._tiene_columna(cur, "saltos", "estabilidad_aterrizaje"):
-                columnas.append("estabilidad_aterrizaje")
-                valores.append(json.dumps(estabilidad_aterrizaje) if estabilidad_aterrizaje else None)
-            if self._tiene_columna(cur, "saltos", "curvas_json"):
-                columnas.append("curvas_json")
-                valores.append(json.dumps(curvas_json) if curvas_json else None)
-
-            cols_sql = ", ".join(columnas)
-            placeholders = ", ".join(["%s"] * len(columnas))
             cur.execute(
-                f"INSERT INTO saltos ({cols_sql}) VALUES ({placeholders})",
-                tuple(valores),
+                "INSERT INTO gestos (id_usuario, modulo, subtipo, metodo_origen, confianza_ia) "
+                "VALUES (%s, 'salto', %s, %s, %s)",
+                (id_usuario, tipo_salto, metodo_origen, confianza_ia),
             )
-            return cur.lastrowid
+            id_gesto = cur.lastrowid
 
-    def contar_por_tipo(self, id_usuario: int) -> dict[str, int]:
-        """Devuelve {'vertical': N, 'horizontal': M} para un usuario."""
-        with get_connection() as (conn, cur):
             cur.execute(
-                "SELECT tipo_salto, COUNT(*) AS total "
-                "FROM saltos WHERE id_usuario = %s GROUP BY tipo_salto",
-                (id_usuario,),
+                "INSERT INTO gestos_salto "
+                "(id_gesto, tipo_salto, distancia_cm, tiempo_vuelo_s, potencia_w, "
+                " asimetria_pct, angulo_rodilla_deg, angulo_cadera_deg, estabilidad_aterrizaje) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    id_gesto,
+                    tipo_salto,
+                    distancia_cm,
+                    tiempo_vuelo_s,
+                    potencia_w,
+                    asimetria_pct,
+                    angulo_rodilla_deg,
+                    angulo_cadera_deg,
+                    json.dumps(estabilidad_aterrizaje) if estabilidad_aterrizaje else None,
+                ),
             )
-            rows = cur.fetchall()
-        resultado = {"vertical": 0, "horizontal": 0}
-        for r in rows:
-            resultado[r["tipo_salto"]] = r["total"]
-        return resultado
 
-    def obtener_por_usuario_y_tipo(self, id_usuario: int, tipo_salto: str) -> list[dict]:
-        with get_connection() as (conn, cur):
-            campos = self._campos_saltos_select(cur, alias="s")
-            cur.execute(
-                f"SELECT {campos} FROM saltos s "
-                "WHERE s.id_usuario = %s AND s.tipo_salto = %s "
-                "ORDER BY s.fecha_salto ASC",
-                (id_usuario, tipo_salto),
-            )
-            return cur.fetchall()
+            if curvas_json:
+                cur.execute(
+                    "INSERT INTO gestos_curvas (id_gesto, curvas_json) VALUES (%s, %s)",
+                    (id_gesto, json.dumps(curvas_json)),
+                )
+
+            return id_gesto
 
     def actualizar(
         self,
@@ -304,84 +253,101 @@ class SaltoModel:
         estabilidad_aterrizaje: dict | None = None,
     ) -> bool:
         with get_connection() as (conn, cur):
-            sets = [
-                "tipo_salto = %s",
-                "distancia_cm = %s",
-                "tiempo_vuelo_s = %s",
-                "confianza_ia = %s",
-                "metodo_origen = %s",
-            ]
-            valores = [tipo_salto, distancia_cm, tiempo_vuelo_s, confianza_ia, metodo_origen]
-
-            if self._tiene_columna(cur, "saltos", "potencia_w"):
-                sets.append("potencia_w = %s")
-                valores.append(potencia_w)
-            if self._tiene_columna(cur, "saltos", "asimetria_pct"):
-                sets.append("asimetria_pct = %s")
-                valores.append(asimetria_pct)
-            if self._tiene_columna(cur, "saltos", "angulo_rodilla_deg"):
-                sets.append("angulo_rodilla_deg = %s")
-                valores.append(angulo_rodilla_deg)
-            if self._tiene_columna(cur, "saltos", "angulo_cadera_deg"):
-                sets.append("angulo_cadera_deg = %s")
-                valores.append(angulo_cadera_deg)
-            if self._tiene_columna(cur, "saltos", "estabilidad_aterrizaje"):
-                sets.append("estabilidad_aterrizaje = %s")
-                valores.append(json.dumps(estabilidad_aterrizaje) if estabilidad_aterrizaje is not None else None)
-
-            valores.append(id_salto)
             cur.execute(
-                f"UPDATE saltos SET {', '.join(sets)} WHERE id_salto = %s",
-                tuple(valores),
+                "UPDATE gestos SET subtipo = %s, metodo_origen = %s, confianza_ia = %s "
+                "WHERE id_gesto = %s AND modulo = 'salto'",
+                (tipo_salto, metodo_origen, confianza_ia, id_salto),
             )
-            return cur.rowcount > 0
-
-    def obtener_historial_analitica_usuario(self, id_usuario: int, tipo_salto: str | None = None) -> list[dict]:
-        """Historial enriquecido para analítica avanzada por usuario."""
-        with get_connection() as (conn, cur):
-            campos_saltos = self._campos_saltos_select(cur, alias="s")
-            peso_expr = self._expr_col(cur, "u", "usuarios", "peso_kg")
-            sql = (
-                f"SELECT {campos_saltos}, {peso_expr}, u.alias "
-                "FROM saltos s "
-                "INNER JOIN usuarios u ON u.id_usuario = s.id_usuario "
-                "WHERE s.id_usuario = %s"
+            cur.execute(
+                "UPDATE gestos_salto SET tipo_salto = %s, distancia_cm = %s, "
+                "tiempo_vuelo_s = %s, potencia_w = %s, asimetria_pct = %s, "
+                "angulo_rodilla_deg = %s, angulo_cadera_deg = %s, "
+                "estabilidad_aterrizaje = %s WHERE id_gesto = %s",
+                (
+                    tipo_salto,
+                    distancia_cm,
+                    tiempo_vuelo_s,
+                    potencia_w,
+                    asimetria_pct,
+                    angulo_rodilla_deg,
+                    angulo_cadera_deg,
+                    json.dumps(estabilidad_aterrizaje) if estabilidad_aterrizaje is not None else None,
+                    id_salto,
+                ),
             )
-            params: list = [id_usuario]
-
-            if tipo_salto:
-                sql += " AND s.tipo_salto = %s"
-                params.append(tipo_salto)
-
-            sql += " ORDER BY s.fecha_salto ASC"
-            cur.execute(sql, tuple(params))
-            return cur.fetchall()
-
-    def obtener_historial_analitica_global(self, tipo_salto: str | None = None) -> list[dict]:
-        """Historial global enriquecido para correlaciones y rankings."""
-        with get_connection() as (conn, cur):
-            campos_saltos = self._campos_saltos_select(cur, alias="s")
-            peso_expr = self._expr_col(cur, "u", "usuarios", "peso_kg")
-            sql = (
-                f"SELECT {campos_saltos}, {peso_expr}, u.alias "
-                "FROM saltos s "
-                "INNER JOIN usuarios u ON u.id_usuario = s.id_usuario "
-                "WHERE 1 = 1"
-            )
-            params: list = []
-
-            if tipo_salto:
-                sql += " AND s.tipo_salto = %s"
-                params.append(tipo_salto)
-
-            sql += " ORDER BY s.fecha_salto ASC"
-            cur.execute(sql, tuple(params))
-            return cur.fetchall()
+            return cur.rowcount >= 0
 
     def eliminar(self, id_salto: int) -> bool:
+        # CASCADE limpia gestos_salto, gestos_curvas, gestos_videos, gestos_alertas.
         with get_connection() as (conn, cur):
             cur.execute(
-                "DELETE FROM saltos WHERE id_salto = %s",
+                "DELETE FROM gestos WHERE id_gesto = %s AND modulo = 'salto'",
                 (id_salto,),
             )
             return cur.rowcount > 0
+
+    # ── Videos (gestos_videos) ──────────────────────────────────
+    def obtener_videos_guardados(
+        self,
+        id_usuario: int | None = None,
+        tipo_salto: str | None = None,
+    ) -> list[dict]:
+        params: list = []
+        where = ["1 = 1"]
+        if id_usuario is not None:
+            where.append("s.id_usuario = %s")
+            params.append(id_usuario)
+        if tipo_salto:
+            where.append("s.tipo_salto = %s")
+            params.append(tipo_salto)
+
+        sql = (
+            "SELECT s.id_salto, s.id_usuario, u.alias, u.altura_m, u.peso_kg, s.tipo_salto, s.distancia_cm, "
+            "s.tiempo_vuelo_s, s.metodo_origen, s.fecha_salto, "
+            "v.video_nombre, v.video_mime, LENGTH(v.video_blob) AS tamano_bytes "
+            "FROM v_saltos s "
+            "INNER JOIN usuarios u      ON u.id_usuario = s.id_usuario "
+            "INNER JOIN gestos_videos v ON v.id_gesto   = s.id_salto "
+            f"WHERE {' AND '.join(where)} "
+            "ORDER BY s.fecha_salto DESC"
+        )
+        with get_connection() as (conn, cur):
+            cur.execute(sql, tuple(params))
+            return cur.fetchall()
+
+    def obtener_video_por_id_salto(self, id_salto: int) -> dict | None:
+        with get_connection() as (conn, cur):
+            cur.execute(
+                "SELECT s.id_salto, s.id_usuario, s.tipo_salto, s.fecha_salto, "
+                "v.video_nombre, v.video_mime, v.video_blob "
+                "FROM v_saltos s "
+                "INNER JOIN gestos_videos v ON v.id_gesto = s.id_salto "
+                "WHERE s.id_salto = %s",
+                (id_salto,),
+            )
+            return cur.fetchone()
+
+    def guardar_video_bd(
+        self,
+        id_salto: int,
+        video_bytes: bytes,
+        video_nombre: str | None,
+        video_mime: str | None,
+    ) -> bool:
+        if not video_bytes:
+            return False
+        try:
+            with get_connection() as (conn, cur):
+                cur.execute(
+                    "INSERT INTO gestos_videos (id_gesto, video_blob, video_nombre, video_mime) "
+                    "VALUES (%s, %s, %s, %s) "
+                    "ON DUPLICATE KEY UPDATE "
+                    "video_blob = VALUES(video_blob), "
+                    "video_nombre = VALUES(video_nombre), "
+                    "video_mime = VALUES(video_mime)",
+                    (id_salto, video_bytes, video_nombre, video_mime),
+                )
+                return True
+        except mysql.connector.Error as exc:
+            logging.getLogger(__name__).warning("guardar_video_bd fallo: %s", exc)
+            return False

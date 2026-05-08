@@ -1,0 +1,104 @@
+/* sensor.css
+   Estilos exclusivos de la vista del sensor / arduino.
+*/
+
+.sensor-page {
+    background-color: var(--bg-dark);
+    background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: 60px 60px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    margin: 0;
+}
+
+.sensor-wrapper {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0 1.5rem;
+}
+
+.sensor-display {
+    width: 100%;
+    max-width: 400px;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 32px;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.estado-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+}
+
+.estado-badge.conectado {
+    background: rgba(133, 76, 181, 0.2);
+    color: #b580e2;
+}
+
+.estado-badge.desconectado {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+}
+
+.estado-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.conectado .estado-dot { background: #b580e2; }
+.desconectado .estado-dot { background: var(--text-muted); }
+
+.display-label {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.display-value {
+    font-size: 4rem;
+    font-weight: 900;
+    margin: 0.5rem 0 1rem;
+    color: var(--text-light);
+}
+
+.display-timestamp {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.85rem;
+}
+
+.sensor-hud {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.8rem;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    padding-bottom: 3rem;
+}
+
+.sensor-nota {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.8rem;
+    text-align: center;
+}

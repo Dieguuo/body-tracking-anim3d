@@ -10,13 +10,27 @@ document.addEventListener('DOMContentLoaded', () => {
     let detectando = false;
     let iaLista = false;
     let usuarioSeleccionado = false;
+    let enModoPortrait = false;
+
+    // Muestra/oculta el overlay de orientación y bloquea el botón si la cámara
+    // está en retrato. Se llama cada vez que cambian las dimensiones del vídeo.
+    function comprobarOrientacion() {
+        const alertaEl = document.getElementById('alerta-orientacion');
+        const w = videoElement.videoWidth;
+        const h = videoElement.videoHeight;
+        // Si aún no tenemos dimensiones reales (stream no iniciado), salimos.
+        if (!w || !h) { return; }
+        enModoPortrait = h > w;
+        if (alertaEl) { alertaEl.style.display = enModoPortrait ? 'flex' : 'none'; }
+        actualizarEstadoBotonDeteccion();
+    }
 
     function actualizarEstadoBotonDeteccion() {
         if (!btnGrabar || !btnText) {
             return;
         }
 
-        const habilitado = iaLista && usuarioSeleccionado;
+        const habilitado = iaLista && usuarioSeleccionado && !enModoPortrait;
         btnGrabar.disabled = !habilitado;
 
         if (!iaLista) {
@@ -91,6 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             videoElement.srcObject = stream;
+            // Comprobar orientación cuando el stream tenga dimensiones reales,
+            // y de nuevo si el usuario rota el dispositivo durante la sesión.
+            videoElement.addEventListener('loadedmetadata', comprobarOrientacion);
+            videoElement.addEventListener('resize', comprobarOrientacion);
         } catch (error) {
             mostrarGuiaPermisos(error);
         }

@@ -10,9 +10,11 @@ Guía paso a paso para usar la aplicación web de medición física.
 2. [Arrancar la aplicación](#2-arrancar-la-aplicación)
 3. [Pantalla principal (Landing)](#3-pantalla-principal)
 4. [Módulo Cámara / Salto](#4-módulo-cámara--salto)
-5. [Módulo Sensor Arduino](#5-módulo-sensor-arduino)
-6. [Acceso desde el móvil](#6-acceso-desde-el-móvil)
-7. [Solución de problemas](#7-solución-de-problemas)
+5. [Módulo Cámara / Futbol](#5-módulo-cámara--futbol)
+6. [Módulo Sensor Arduino](#6-módulo-sensor-arduino)
+7. [Acceso desde el móvil](#7-acceso-desde-el-móvil)
+8. [Solución de problemas](#8-solución-de-problemas)
+9. [API REST — Usuarios, Saltos y Comparativa](#9-api-rest--usuarios-saltos-y-comparativa)
 
 ---
 
@@ -204,7 +206,167 @@ Pulsar **"Nuevo Salto"** para volver a la vista de cámara y hacer otro intento.
 
 ---
 
-## 5. Módulo Sensor Arduino
+## 5. Módulo Cámara / Fútbol
+
+### ¿Qué hace?
+
+Analiza la técnica de golpeo de balón usando inteligencia artificial (MediaPipe Pose). Calcula ángulos articulares, velocidad del pie en el impacto, estabilidad del tronco, detecta la pierna de golpeo y genera alertas biomécanicas accionables.
+
+---
+
+### Posición de cámara — **importante para resultados correctos**
+
+El sistema analiza el movimiento en **2D** (plano de la imagen). Una posición incorrecta de la cámara produce mediciones inválidas.
+
+**Configuración correcta (modo horizontal/paisaje):**
+
+```
+         ←——— 4–6 metros ———→
+[CÁMARA] ════════════ [JUGADOR] →→ (dirección del tiro)
+```
+
+| Requisito | Detalle |
+|-----------|---------|
+| **Plano** | Cámara perpendicular (90°) a la trayectoria del tiro |
+| **Distancia** | 4–6 metros para ver el cuerpo completo |
+| **Altura** | A nivel cadera–rodilla (~0.8–1.0 m del suelo) |
+| **Encuadre** | Cabeza y ambos pies visibles en todo momento |
+| **Eje** | El jugador se desplaza de izquierda a derecha (o al revés) |
+| **Evitar** | Vista frontal o diagonal — distorsiona todos los ángulos |
+
+---
+
+### Paso a paso
+
+#### 1. Seleccionar modo de grabación
+
+En el desplegable **Modo** (encima de la cámara) elige:
+
+| Modo | Descripción |
+|------|-------------|
+| **Tiro individual** | Analiza un tiro aislado |
+| **Tiros comparativa (4 tiros)** | El sistema agrupa 4 tiros consecutivos y muestra una tabla comparativa automática |
+
+#### 2. Seleccionar o crear usuario
+
+- Busca tu nombre en la tabla de usuarios o créate un perfil nuevo (alias, nombre, altura, peso).
+- Con usuario activo, el golpeo se guarda en la base de datos.
+- Sin usuario, el análisis se muestra pero no se persiste.
+
+#### 3. Grabar o subir el vídeo
+
+**Opción A — Grabar con la cámara:**
+
+1. El navegador pedirá permiso de cámara. **Aceptar**.
+2. Pulsa **"Iniciar grabación"**. Aparece el icono rojo de grabación activa.
+3. Realiza el golpeo frente a la cámara.
+4. Pulsa de nuevo para detener la grabación.
+5. El sistema procesa automáticamente el vídeo.
+
+**Opción B — Subir vídeo existente:**
+
+1. Pulsa **"Subir vídeo de la galería"**.
+2. Selecciona un archivo (.mp4, .webm, .mov, .avi, máx. 100 MB).
+
+#### 4. Guardar datos y vídeo
+
+Antes de grabar, en **"¿Guardar vídeo en BD?"** elige:
+
+| Opción | Resultado |
+|--------|-----------|
+| **Sí, guardar vídeo + datos** | Guarda las métricas Y el archivo de vídeo en MySQL |
+| **No, solo guardar datos** | Guarda solo las métricas (recomendado para ahorrar espacio) |
+
+#### 5. Ver resultados
+
+Tras el análisis aparece un panel con todas las métricas del golpeo:
+
+##### Métricas principales
+
+| Campo | Significado |
+|-------|-------------|
+| **Pierna de apoyo** | Pierna que permanece en el suelo durante el golpeo |
+| **Pierna de golpeo** | Pierna que impacta el balón (detectada automáticamente) |
+| **Áng. Cadera** | Ángulo de la cadera de la pierna de golpeo en el frame de impacto (grados) |
+| **Áng. Rodilla** | Ángulo de la rodilla de la pierna de golpeo en el impacto (grados) |
+| **Áng. Tobillo** | Ángulo del tobillo de la pierna de golpeo en el impacto (grados) |
+| **Estabilidad tronco** | Score 0–100 de la estabilidad lateral del tronco durante el gesto (100 = perfecto) |
+| **Confianza** | Porcentaje de frames en los que MediaPipe detectó correctamente la pose |
+| **Vel. pie (m/s)** | Velocidad del pie de golpeo en el momento del impacto (m/s) |
+| **Frame impacto** | Número de frame donde se detectó el impacto |
+| **Asimetría (%)** | Diferencia media entre lado izquierdo y derecho de la postura. Alerta si > 15% |
+| **Apoyo (score)** | Estabilidad angular de la rodilla de apoyo durante el impacto (0–100) |
+| **Clasificación** | Categoría del golpeo: `tecnica_estable`, `inestable`, `asimetrico`, `tecnico_lento`, `potente_estable`, `fatigado` |
+
+##### Score compuesto (0–100)
+
+Puntuación global de la ejecución ponderando velocidad (40%), estabilidad (25%), confianza (20%) y ángulo de cadera (15%).
+
+| Rango | Interpretación |
+|-------|----------------|
+| 80–100 | Ejecución óptima |
+| 60–79 | Ejecución correcta con margen de mejora |
+| 40–59 | Técnica mejorable |
+| < 40 | Requiere corrección |
+
+##### Alertas biomécanicas
+
+El sistema genera alertas automáticas cuando detecta desviaciones técnicas:
+
+| Alerta | Condición | Severidad |
+|--------|-----------|-----------|
+| Rodilla excesivamente extendida | Áng. rodilla > 165° en el impacto | Media |
+| Armado corto | Áng. cadera < 130° antes del impacto | Media |
+| Tronco inestable | Estabilidad tronco < 60 | Alta |
+| Pierna de apoyo inestable | Score apoyo < 50 | Alta |
+| Postura asimétrica | Asimetría > 15% | Media |
+| Velocidad del pie baja | Vel. pie < 8 m/s | Media |
+| Detección baja | Confianza < 60% | Baja |
+
+##### Fases del gesto
+
+El sistema detecta automáticamente 4 fases:
+
+| Fase | Descripción |
+|------|-------------|
+| **Aproximación** | Carrera previa al golpeo |
+| **Armado** | Flexion máxima de cadera antes del impacto |
+| **Impacto** | Ventana de frames alrededor del contacto con el balón |
+| **Follow-through** | Extensión tras el impacto |
+
+##### Gráficas de curvas angulares
+
+Dos gráficas Chart.js muestran la evolución de ángulos frame a frame:
+- **Cadera, Rodilla y Tobillo vs. tiempo** (grados)
+- **Velocidades articulares** (grados/segundo)
+
+#### 6. Vídeo anotado
+
+Pulsa **"Ver vídeo anotado"** para generar un MP4 con overlay:
+- Esqueleto de landmarks dibujado sobre cada frame.
+- Ángulos de rodilla y cadera en tiempo real.
+- Marcador del frame de impacto.
+
+#### 7. Biblioteca de vídeos
+
+- Pulsa **"Abrir biblioteca de vídeos"** para ver el historial de golpeos guardados.
+- Puedes filtrar por usuario y reproducir los vídeos anotados anteriores.
+- En modo comparativa, se muestra una tabla con los 4 tiros de cada sesión.
+
+---
+
+### Consejos para mejores resultados
+
+- Graba de cuerpo entero, con la cámara fija y perpendicular al tiro.
+- Asegúrate de que ambos pies y la cabeza son visibles en todo momento.
+- Iluminación uniforme y fondo liso (pared o césped homogéneo).
+- Evita que haya otras personas en el encuadre.
+- Si la confianza es < 60%, repite la grabación con mejores condiciones de luz.
+- Velocidades < 5 m/s suelen indicar un encuadre incorrecto o que el balón no se golpeó.
+
+---
+
+## 6. Módulo Sensor Arduino
 
 ### ¿Qué hace?
 
@@ -238,7 +400,7 @@ Pulsar **"Detener"** para dejar de consultar al sensor.
 
 ---
 
-## 6. Acceso desde el móvil
+## 7. Acceso desde el móvil
 
 Si quieres grabar un salto con la cámara del móvil:
 
@@ -257,13 +419,13 @@ Si quieres grabar un salto con la cámara del móvil:
 
 ---
 
-## 7. Solución de problemas
+## 8. Solución de problemas
 
 | Problema | Causa probable | Solución |
 |----------|---------------|----------|
 | "Error al conectar con localhost:5001" | Backend de salto no está arrancado | Ejecutar `python app.py` en `modules/salto/backend` |
 | "Error al conectar con localhost:5000" | Backend del sensor no está arrancado | Ejecutar `python app.py` en `modules/sensor/backend` |
-| La cámara no se activa | No se dieron permisos / no hay HTTPS | Aceptar permisos del navegador. Desde móvil, ver sección 6 |
+| La camara no se activa | No se dieron permisos / no hay HTTPS | Aceptar permisos del navegador. Desde movil, ver seccion 7 |
 | "Introduce una altura válida" | Campo de altura vacío o con valor ≤ 0 | Escribir la estatura en metros (ej: 1.75) |
 | "Extensión no permitida" | Formato de vídeo no soportado | Usar .mp4, .webm, .avi o .mov |
 | Badge rojo en sensor | Arduino no conectado o backend caído | Verificar USB + que el backend esté corriendo |
@@ -271,11 +433,11 @@ Si quieres grabar un salto con la cámara del móvil:
 
 ---
 
-## 8. API REST — Usuarios, Saltos y Comparativa
+## 9. API REST — Usuarios, Saltos y Comparativa
 
 El backend del módulo salto (puerto 5001) expone, además del endpoint de cálculo, una API CRUD completa para gestionar usuarios y saltos en base de datos MySQL.
 
-### 8.1 Usuarios
+### 9.1 Usuarios
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
@@ -285,7 +447,7 @@ El backend del módulo salto (puerto 5001) expone, además del endpoint de cálc
 | `PUT` | `/api/usuarios/<id>` | Actualiza un usuario (JSON: mismos campos) |
 | `DELETE` | `/api/usuarios/<id>` | Elimina un usuario y todos sus saltos (CASCADE) |
 
-### 8.2 Saltos
+### 9.2 Saltos
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
@@ -296,14 +458,14 @@ El backend del módulo salto (puerto 5001) expone, además del endpoint de cálc
 | `DELETE` | `/api/saltos/<id>` | Elimina un salto |
 | `GET` | `/api/usuarios/<id>/saltos` | Lista los saltos de un usuario |
 
-### 8.3 Progreso y comparativa
+### 9.3 Progreso y comparativa
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
 | `GET` | `/api/usuarios/<id>/progreso` | Cuántos saltos tiene y cuántos le faltan (mín. 4+4) |
 | `GET` | `/api/usuarios/<id>/comparativa` | Estadísticas por tipo (mejor, peor, media, último, evolución). Devuelve 403 si no cumple el mínimo |
 
-### 8.4 Guardado automático desde el cálculo
+### 9.4 Guardado automatico desde el calculo
 
 El endpoint `POST /api/salto/calcular` acepta opcionalmente:
 
@@ -316,7 +478,7 @@ El endpoint `POST /api/salto/calcular` acepta opcionalmente:
 
 La respuesta incluirá `id_salto` si el guardado fue exitoso.
 
-### 8.5 Base de datos
+### 9.5 Base de datos
 
 MySQL con base de datos `bd_anim3d_saltos`. Dos tablas:
 
@@ -325,7 +487,7 @@ MySQL con base de datos `bd_anim3d_saltos`. Dos tablas:
 
 La conexión se configura en `modules/salto/backend/config.py` (`DB_CONFIG`).
 
-### 8.6 Analítica avanzada
+### 9.6 Analitica avanzada
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
@@ -334,7 +496,7 @@ La conexión se configura en `modules/salto/backend/config.py` (`DB_CONFIG`).
 
 Ambos endpoints aceptan `?tipo=vertical` o `?tipo=horizontal` (por defecto: `vertical`).
 
-### 8.7 Vídeo anotado
+### 9.7 Video anotado
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
@@ -349,3 +511,59 @@ Ambos endpoints aceptan `?tipo=vertical` o `?tipo=horizontal` (por defecto: `ver
 | `altura_real_m` | float | Siempre | Altura real del usuario en metros |
 
 **Respuesta:** descarga directa del vídeo anotado como `.mp4`.
+
+---
+
+### 9.8 Futbol — usuarios, golpeos y videos
+
+El backend del modulo futbol (puerto 5002) expone endpoints equivalentes para usuarios y guardado de golpeos.
+
+#### Usuarios
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| `GET` | `/api/usuarios_futbol` | Lista usuarios (soporta `paginado=1`) |
+| `POST` | `/api/usuarios_futbol` | Crea usuario (`alias`, `nombre_completo`, `altura_m`, `peso_kg` opcional) |
+| `GET` | `/api/usuarios_futbol/<id>` | Obtiene usuario |
+| `PUT` | `/api/usuarios_futbol/<id>` | Actualiza usuario |
+| `DELETE` | `/api/usuarios_futbol/<id>` | Elimina usuario y sus golpeos (CASCADE) |
+
+#### Golpeos
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| `POST` | `/api/futbol/analizar` | Analiza video y opcionalmente guarda en BD. Devuelve metricas + curvas + fases + alertas + clasificacion |
+| `POST` | `/api/futbol/video-anotado` | Devuelve MP4 con overlay (esqueleto, angulos, banner de impacto, trayectoria del pie) |
+| `GET` | `/api/golpeos` | Lista golpeos guardados |
+| `GET` | `/api/golpeos/<id>` | Obtiene un golpeo |
+| `GET` | `/api/golpeos/<id>/curvas` | Curvas angulares por frame |
+| `GET` | `/api/golpeos/<id>/landmarks` | Landmarks por frame (visor) |
+| `GET` | `/api/golpeos/<id>/alertas` | Alertas almacenadas |
+| `DELETE` | `/api/golpeos/<id>` | Elimina un golpeo |
+
+#### Analitica por jugador
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| `GET` | `/api/usuarios_futbol/<id>/fatiga?metrica=velocidad_pie_ms` | Fatiga intra-sesion (ventana 2h): pendiente, caida % |
+| `GET` | `/api/usuarios_futbol/<id>/tendencia?metrica=&semanas=4` | Regresion lineal sobre historial. Estado: mejorando/estancado/empeorando |
+| `GET` | `/api/usuarios_futbol/<id>/comparativa?n=4` | Ultimas N patadas con metricas clave |
+
+#### Videos
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| `GET` | `/api/videos` | Biblioteca de videos guardados (filtro `id_usuario`) |
+| `GET` | `/api/videos/<id>/stream` | Streaming del video guardado |
+
+#### Guardado automatico desde el analisis
+
+El endpoint `POST /api/futbol/analizar` acepta:
+
+| Campo | Tipo | Descripcion |
+|-------|------|-------------|
+| `id_usuario` | int | Si se envia, el resultado se guarda automaticamente |
+| `guardar_bd` | bool | Fuerza el guardado del golpeo en BD |
+| `guardar_video_bd` | bool | Si es `true`, guarda el video en BD |
+| `metodo_origen` | string | `ia_vivo` o `video_galeria` |
+| `incluir_landmarks` | bool | Si es `true`, incluye landmarks en la respuesta |

@@ -115,15 +115,45 @@ function fijarTamanoGraficasAnalitica() {
 // getBackendBaseUrl() se carga desde js/config.js
 
 function getUsuarioActivo() {
-    const idUsuario = sessionStorage.getItem('idUser');
+    // Usar helper compartido (window.UsuarioActivo) si está disponible.
+    // Salto requiere altura adicional para algunos cálculos.
     const altura = parseFloat(sessionStorage.getItem('alturaUser') || '0');
+    if (!(altura > 0)) {
+        return null;
+    }
 
-    if (!idUsuario || !(altura > 0)) {
+    if (typeof window !== 'undefined' && window.UsuarioActivo) {
+        const u = window.UsuarioActivo.obtener();
+        if (u && u.idUsuario) {
+            return { idUsuario: u.idUsuario, altura: altura };
+        }
+        return null;
+    }
+
+    // Fallback (compatibilidad): lectura directa con normalizacion de formatos.
+    const rawId = sessionStorage.getItem('idUser');
+    if (!rawId) {
+        return null;
+    }
+
+    let idNum = Number(rawId);
+    if (!Number.isFinite(idNum)) {
+        try {
+            const parsed = JSON.parse(rawId);
+            if (parsed) {
+                idNum = Number(parsed.id_usuario || parsed.idUser || parsed.id || parsed);
+            }
+        } catch (_e) {
+            // No JSON — dejar idNum invalido
+        }
+    }
+
+    if (!Number.isFinite(idNum) || idNum <= 0) {
         return null;
     }
 
     return {
-        idUsuario: Number(idUsuario),
+        idUsuario: Number(idNum),
         altura: altura
     };
 }
@@ -2006,10 +2036,20 @@ document.addEventListener('videoListo', async (evento) => {
     formData.append('tipo_salto', tipoSalto);
     formData.append('altura_real_m', alturaUsuario);
 
+    // Preferencia de guardado (misma que el flujo en tiempo real)
+    const guardarVideo = getPreferenciaGuardarVideoTiempoReal() === 'si';
+    formData.append('guardar_video_bd', guardarVideo ? 'true' : 'false');
+
+    // Indicar el origen (galería) siempre para que el backend registre el origen
+    formData.append('metodo_origen', 'video_galeria');
+
     if (idUsuario) {
-        formData.append('id_usuario', idUsuario);
-        formData.append('metodo_origen', 'video_galeria');
+        const idNum = Number(idUsuario);
+        if (Number.isFinite(idNum) && idNum > 0) {
+            formData.append('id_usuario', String(idNum));
+        }
     }
+
     // Mantiene el mismo contrato de salida que tiempo real para visor landmarks.
     formData.append('incluir_landmarks', 'true');
 
@@ -3566,7 +3606,10 @@ function configurarBotonVideoAnotado(datos) {
 
             const idUsuario = sessionStorage.getItem('idUser');
             if (idUsuario) {
-                formData.append('id_usuario', idUsuario);
+                const idNum = Number(idUsuario);
+                if (Number.isFinite(idNum) && idNum > 0) {
+                    formData.append('id_usuario', String(idNum));
+                }
             }
 
             const respuesta = await fetch(`${getBackendBaseUrl()}/api/salto/video-anotado`, {

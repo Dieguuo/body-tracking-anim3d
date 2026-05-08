@@ -1,0 +1,695 @@
+/* analitica.css
+   Paneles de métricas, gráficas, timeline y análisis avanzado.
+*/
+
+.panel-comparativa-sesion {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.panel-comparativa-sesion .comparativa-wrapper {
+    margin-top: 0.2rem;
+}
+
+.videos-info-card {
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 18px;
+    padding: 1rem;
+}
+
+.panel-analitica,
+.panel-comparativa-sesion {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 18px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.panel-analitica .panel-title,
+.panel-comparativa-sesion .panel-title,
+.panel-analitica .panel-subtitle,
+.panel-comparativa-sesion .panel-subtitle {
+    margin-bottom: 0;
+}
+
+.panel-analitica .panel-subtitle,
+.panel-comparativa-sesion .panel-subtitle {
+    margin-top: 0.25rem;
+    color: #d7b9f3;
+    font-size: 0.92rem;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+}
+
+.panel-analitica canvas,
+.panel-comparativa-sesion canvas {
+    width: 100% !important;
+    max-width: 100%;
+}
+
+.panel-analitica canvas {
+    height: 180px !important;
+}
+
+.panel-analitica .comparativa-wrapper,
+.panel-comparativa-sesion .comparativa-wrapper {
+    overflow-x: auto;
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.16);
+    padding: 0.4rem;
+}
+
+.panel-analitica .tabla-comparativa,
+.panel-comparativa-sesion .tabla-comparativa {
+    min-width: 660px;
+    width: 100%;
+    table-layout: fixed;
+}
+
+.panel-analitica .tabla-comparativa th,
+.panel-analitica .tabla-comparativa td,
+.panel-comparativa-sesion .tabla-comparativa th,
+.panel-comparativa-sesion .tabla-comparativa td {
+    padding: 0.35rem 0.42rem;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.panel-analitica .tabla-comparativa th,
+.panel-comparativa-sesion .tabla-comparativa th {
+    font-size: 0.72rem;
+}
+
+.panel-analitica .comparativa-wrapper {
+    margin-top: 0.15rem;
+}
+
+.ia-lista {
+    background: var(--purple-brand) !important;
+}
+
+.results-content {
+    overflow-y: auto;
+}
+
+.analitica-panel {
+    margin-top: 0.35rem;
+    width: 100%;
+    border: 1px solid rgba(203, 156, 255, 0.28);
+    background: rgba(111, 56, 183, 0.08);
+    border-radius: 14px;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.analitica-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.analitica-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: auto;
+}
+
+.analitica-select {
+    height: 34px;
+    border-radius: 10px;
+    padding: 0.35rem 0.45rem;
+    font-size: 0.78rem;
+    min-width: 150px;
+    max-width: 100%;
+}
+
+.analitica-titulo {
+    font-size: 0.95rem;
+    color: #d7b9f3;
+    flex: 1 1 150px;
+}
+
+.analitica-refresh {
+    height: 34px !important;
+    width: auto !important;
+    min-width: 110px;
+    border-radius: 10px;
+    font-size: 0.83rem !important;
+}
+
+.fatiga-alerta {
+    border-radius: 10px;
+    border: 1px solid rgba(248, 118, 135, 0.55);
+    background: rgba(187, 62, 77, 0.2);
+    color: #ffc3cc;
+    font-size: 0.84rem;
+    line-height: 1.35;
+    padding: 0.6rem 0.65rem;
+}
+
+.alertas-tendencia {
+    border-radius: 10px;
+    border: 1px solid rgba(255, 214, 102, 0.45);
+    background: rgba(196, 128, 40, 0.2);
+    color: #ffe4b5;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    padding: 0.55rem 0.65rem;
+    text-align: left;
+}
+
+.analitica-metricas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.45rem;
+}
+
+.metrica-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.5rem 0.55rem;
+}
+
+.metrica-label {
+    font-size: 0.73rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
+}
+
+.metrica-item strong {
+    font-size: 0.92rem;
+    color: #ffffff;
+}
+
+.analitica-avanzada-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+}
+
+.metrica-item-wide {
+    min-height: 88px;
+    border-radius: 12px;
+    border: 1px solid rgba(203, 156, 255, 0.26);
+    background:
+        linear-gradient(165deg, rgba(255, 255, 255, 0.05) 0%, rgba(111, 56, 183, 0.18) 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.metrica-item-wide strong {
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: #f6eeff;
+    white-space: pre-line;
+}
+
+.analitica-avanzada-grid .metrica-item-wide:nth-child(1) {
+    border-color: rgba(89, 255, 199, 0.38);
+}
+
+.analitica-avanzada-grid .metrica-item-wide:nth-child(2) {
+    border-color: rgba(255, 214, 102, 0.4);
+}
+
+.analitica-avanzada-grid .metrica-item-wide:nth-child(3) {
+    border-color: rgba(248, 118, 135, 0.4);
+}
+
+.analitica-avanzada-grid .metrica-item-wide:nth-child(4) {
+    border-color: rgba(203, 156, 255, 0.4);
+}
+
+.analitica-avanzada-grid .metrica-item-wide:nth-child(5) {
+    border-color: rgba(157, 192, 255, 0.45);
+}
+
+.analitica-avanzada-grid .metrica-item-wide:nth-child(6) {
+    border-color: rgba(255, 179, 102, 0.4);
+}
+
+.analitica-grafica-title {
+    font-size: 0.8rem;
+    color: #d8c3ef;
+    margin: 0 0 0.35rem 0.1rem;
+    letter-spacing: 0.2px;
+}
+
+.analitica-grafica-wrap-advanced {
+    min-height: 230px;
+}
+
+.analitica-empty-text {
+    margin: 0.45rem 0.1rem 0.2rem 0.1rem;
+    font-size: 0.82rem;
+    color: #d4bfdc;
+    line-height: 1.35;
+}
+
+.analitica-grafica-wrap {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.18);
+    padding: 0.45rem;
+    height: 220px;
+    min-height: 220px;
+    max-height: 220px;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    align-items: stretch;
+}
+
+.analitica-grafica-wrap canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0;
+    max-height: 100% !important;
+}
+
+#wrap-grafica-tendencia,
+#wrap-grafica-asimetria,
+#wrap-grafica-corr-peso-potencia,
+#wrap-grafica-corr-asim-estabilidad {
+    height: 220px !important;
+    min-height: 220px !important;
+    max-height: 220px !important;
+    overflow: hidden !important;
+}
+
+#wrap-grafica-tendencia canvas,
+#wrap-grafica-asimetria canvas,
+#wrap-grafica-corr-peso-potencia canvas,
+#wrap-grafica-corr-asim-estabilidad canvas {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+}
+
+.analisis-panel {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+.analisis-panel-titulo {
+    font-size: 0.95rem;
+    color: #cb9cff;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.75rem;
+}
+
+.alerta-biomecanica {
+    margin-top: 0.6rem;
+    border-radius: 10px;
+    border: 1px solid rgba(248, 118, 135, 0.55);
+    background: rgba(187, 62, 77, 0.2);
+    color: #ffc3cc;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    padding: 0.5rem 0.6rem;
+}
+
+.timeline-barra {
+    display: flex;
+    width: 100%;
+    height: 32px;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.timeline-segmento {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #000;
+    font-size: 0.65rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    min-width: 24px;
+}
+
+.timeline-segmento:hover {
+    filter: brightness(1.25);
+}
+
+.timeline-marcador {
+    position: absolute;
+    top: -2px;
+    font-size: 1rem;
+    transform: translateX(-50%);
+    pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
+
+.timeline-detalle {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 0.4rem;
+    text-align: center;
+    min-height: 1.1em;
+}
+
+.grafica-wrap {
+    width: 100%;
+    height: 200px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.18);
+    padding: 0.4rem;
+    margin-top: 0.6rem;
+}
+
+.grafica-wrap canvas {
+    width: 100% !important;
+}
+
+.landmarks-controls {
+    display: grid;
+    gap: 0.55rem;
+}
+
+.landmarks-frame-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #d8c6ea;
+    font-size: 0.82rem;
+}
+
+#landmarks-slider,
+#slider-3d {
+    width: 100%;
+}
+
+/* Controles reproductor 3D del módulo fútbol */
+#preview-3d-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+#preview-view-3d {
+    height: 300px;
+}
+
+.landmarks-switch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.landmarks-switch-btn {
+    height: 36px !important;
+    font-size: 0.82rem !important;
+    border-radius: 10px !important;
+}
+
+.landmarks-switch-btn.active {
+    border-color: rgba(89, 255, 199, 0.6) !important;
+    background: rgba(89, 255, 199, 0.16) !important;
+    color: #b9ffe8 !important;
+}
+
+.landmarks-canvas,
+.landmarks-view-3d {
+    width: 100%;
+    height: 260px;
+    margin-top: 0.65rem;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 12px;
+    background: radial-gradient(circle at 30% 20%, rgba(111, 56, 183, 0.35), rgba(20, 16, 28, 0.92));
+}
+
+.landmarks-view-3d {
+    overflow: hidden;
+    position: relative;
+}
+
+.landmarks-anim-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.landmarks-anim-btn {
+    width: 44px !important;
+    height: 34px !important;
+    font-size: 0.85rem !important;
+    padding: 0 !important;
+    border-radius: 8px !important;
+    flex-shrink: 0;
+}
+
+.landmarks-fase-label {
+    font-size: 0.78rem;
+    color: #b9ffe8;
+    margin-left: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.landmarks-overlay-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+.landmarks-overlay-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.78rem;
+    color: #d8c6ea;
+    cursor: pointer;
+    user-select: none;
+}
+
+.landmarks-overlay-toggle input[type="checkbox"] {
+    accent-color: #59ffc7;
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+.landmarks-metricas-panel {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.6rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.landmarks-metrica {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+.lm-label {
+    font-size: 0.7rem;
+    color: #a89aba;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.lm-valor {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #eee;
+}
+
+.comparativa-wrapper {
+    overflow-x: auto;
+    width: 100%;
+}
+
+.tabla-comparativa {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.tabla-comparativa th,
+.tabla-comparativa td {
+    padding: 0.4rem 0.55rem;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+}
+
+.tabla-comparativa th {
+    color: rgba(203, 156, 255, 0.85);
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.tabla-comparativa tr:last-child td {
+    border-bottom: none;
+}
+
+.tabla-comparativa tr.fila-mejor td {
+    background: rgba(33, 150, 243, 0.15);
+    color: #64b5f6;
+    font-weight: 600;
+}
+
+.landmarks-comparar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.landmarks-comparar-wrap label {
+    color: #d8c6ea;
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+.landmarks-comparar-wrap select {
+    flex: 1;
+    min-width: 120px;
+    padding: 0.3rem 0.45rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.3);
+    color: #eee;
+    font-size: 0.82rem;
+}
+
+.landmarks-canvas-ghost {
+    opacity: 0.45;
+}
+
+#comparar-salto-wrap {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+    flex-wrap: wrap;
+}
+
+#comparar-salto-wrap label {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+#select-salto-comparar {
+    flex: 1;
+    min-width: 180px;
+    padding: 0.35rem 0.5rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text-light);
+    font-size: 0.82rem;
+}
+
+#btn-quitar-comparacion {
+    display: none;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ff6666;
+    border-radius: 6px;
+    padding: 0.25rem 0.55rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+#btn-quitar-comparacion:hover {
+    background: rgba(255, 102, 102, 0.15);
+}
+
+@media (max-width: 720px) {
+    .panel-analitica,
+    .panel-comparativa-sesion,
+    .videos-info-card {
+        padding: 0.9rem;
+        border-radius: 16px;
+    }
+
+    .panel-analitica canvas {
+        height: 160px !important;
+    }
+
+    .panel-analitica .tabla-comparativa,
+    .panel-comparativa-sesion .tabla-comparativa {
+        min-width: 560px;
+    }
+
+    .panel-analitica .tabla-comparativa th,
+    .panel-analitica .tabla-comparativa td,
+    .panel-comparativa-sesion .tabla-comparativa th,
+    .panel-comparativa-sesion .tabla-comparativa td {
+        padding: 0.3rem 0.35rem;
+        font-size: 0.7rem;
+    }
+}
+
+@media (max-width: 430px) {
+    .analitica-tools {
+        justify-content: flex-start;
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .analitica-select {
+        flex: 1 1 100%;
+        min-width: 100%;
+    }
+
+    .analitica-refresh {
+        flex: 0 0 auto;
+    }
+
+    .analitica-avanzada-grid {
+        grid-template-columns: 1fr;
+    }
+}

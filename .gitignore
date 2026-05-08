@@ -29,3 +29,6 @@ Desktop.ini
 # Logs
 *.log
 /certs
+# Dumps SQL locales (backups previos a migraciones)
+backup_*.sql
+*.sql.bak

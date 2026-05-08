@@ -2,6 +2,8 @@
 
 Plataforma web modular para captura, procesamiento y visualización de **mediciones físicas en tiempo real**.
 
+📖 **[Manual de usuario](MANUAL_USUARIO.md)** · 📋 **[Changelog](CHANGELOG.md)**
+
 El proyecto integra múltiples fuentes de datos (Arduino, sensores móviles) bajo una misma arquitectura:
 
 ```
@@ -20,8 +22,9 @@ Documentación detallada en [`docs/`](docs/).
 |--------|--------|-------------|
 | **Módulo 1 — Sensor Arduino** | ✅ Completado | Mide distancia con HC-SR04, expone los datos via API REST |
 | **Módulo 2 — Salto con móvil** | ✅ Backend completado | Analiza vídeo con MediaPipe, calcula salto vertical/horizontal, análisis biomecánico completo |
-| **Base de datos** | ✅ Completada | MySQL — CRUD usuarios/saltos, progreso y comparativa |
-| **Integración web** | ✅ Completada | Frontend web unificado (landing + salto + sensor) |
+| **Módulo 3 — Futbol con móvil** | ✅ Backend inicial | Analiza vídeo con MediaPipe, calcula métricas de golpeo |
+| **Base de datos** | ✅ Unificada (`bd_anim3d`) | MySQL — esquema único compartido por salto y futbol. Ver [`scripts/README_BBDD_UNIFICADA.md`](scripts/README_BBDD_UNIFICADA.md) |
+| **Integración web** | ✅ Completada | Frontend web unificado (landing + salto + futbol + sensor) |
 
 ---
 
@@ -65,17 +68,25 @@ body-tracking-anim3d/
 │       │   └── services/        ← calculo + biomecanica + aterrizaje + cinematico + video_anotado + analitica + comparativa
 │       └── mobile/              # Reservado — cliente móvil
 │
+│   └── futbol/                  ← Módulo 3 (backend inicial)
+│       ├── README.md
+│       ├── backend/             ← Python MVC + Flask API + MediaPipe + MySQL
+│       └── mobile/              # Reservado — cliente móvil
+│
 ├── integration/
 │   ├── README.md
 │   └── web/                     ← Frontend web unificado
 │       ├── index.html           ← Landing con cards de módulos
 │       ├── salto.html           ← Grabación + análisis de salto
+│       ├── futbol.html          ← Grabación + análisis de golpeo
 │       ├── arduino.html         ← Lectura sensor en tiempo real
 │       ├── css/style.css
 │       └── js/
 │           ├── app.js           ← Animaciones del landing
 │           ├── camara.js        ← Grabación vídeo / subida archivo
 │           ├── api_salto.js     ← Envío a API salto + resultados
+│           ├── api_futbol.js    ← Envío a API futbol + resultados
+│           ├── futbol.js        ← UI y grabación del módulo futbol
 │           └── api_sensor.js    ← Polling a API sensor
 │
 ├── scripts/
@@ -115,6 +126,12 @@ Si no tienes certificado o cambiaste de red:
 **Backend salto (puerto 5001):**
 ```powershell
 cd modules\salto\backend
+python app.py
+```
+
+**Backend futbol (puerto 5002):**
+```powershell
+cd modules\futbol\backend
 python app.py
 ```
 
@@ -180,4 +197,5 @@ frontend/app.js       (Frontend)    — fetch cada 1 s → actualiza DOM
 | [docs/flujo_datos.md](docs/flujo_datos.md) | Paso a paso del dato desde el dispositivo al navegador |
 | [docs/fases_proyecto.md](docs/fases_proyecto.md) | Estado de cada fase del proyecto |
 | [docs/decisiones_tecnicas.md](docs/decisiones_tecnicas.md) | Justificaciones de diseño (hilos, locks, parseo, MVC, BD, biomecánica) |
+| [docs/futbol.md](docs/futbol.md) | Descripción del módulo de futbol |
 | [docs/manual_usuario.md](docs/manual_usuario.md) | Guía de uso paso a paso para el usuario final |

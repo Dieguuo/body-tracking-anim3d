@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biblioteca de videos - Futbol</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="videos-page futbol-videos-page">
+    <header class="top-bar">
+        <a href="futbol.html" class="back-button"><span class="arrow">←</span> Volver</a>
+        <h1 class="header-title">Biblioteca de videos (Futbol)</h1>
+    </header>
+
+    <main class="videos-layout">
+        <section class="videos-filtros">
+            <label class="pre-camera-label" for="filtro-usuario">Usuario</label>
+            <select id="filtro-usuario" class="modern-input"></select>
+
+            <button id="btn-refrescar-videos" class="sensor-btn secondary-btn" type="button">Actualizar videos</button>
+            <p id="videos-estado" class="sensor-nota">Cargando biblioteca...</p>
+        </section>
+
+        <section class="videos-seccion videos-info-card">
+            <h2 class="panel-title">Cómo se guardan los tiros</h2>
+            <p class="sensor-nota">La biblioteca separa automáticamente los vídeos guardados en <strong>tiros individuales</strong> y <strong>comparativas de 4 tiros</strong>.</p>
+            <p class="sensor-nota">Si analizas en modo individual, el vídeo queda como tiro suelto. Si analizas en modo comparativa, la sesión se agrupa y la galería lo muestra como comparativa.</p>
+        </section>
+
+        <section class="videos-seccion">
+            <h2 class="panel-title">Comparativas de 4 tiros</h2>
+            <div id="comparativas-container" class="videos-grid"></div>
+            <p id="comparativas-empty" class="sensor-nota" style="display:none;">No hay videos de comparativa con los filtros actuales.</p>
+        </section>
+
+        <section class="videos-seccion">
+            <h2 class="panel-title">Tiros individuales</h2>
+            <div id="individuales-container" class="videos-grid"></div>
+            <p id="individuales-empty" class="sensor-nota" style="display:none;">No hay tiros individuales con los filtros actuales.</p>
+        </section>
+    </main>
+
+    <script src="js/config.js?v=20260507b"></script>
+    <script src="js/shared/formatters.js?v=20260508a"></script>
+    <script src="js/usuario_activo.js?v=20260507b"></script>
+    <script src="js/api_futbol.js?v=20260507b"></script>
+    <script src="js/gallery_helper.js?v=20260508b"></script>
+    <script src="js/futbol_videos.js?v=20260507b"></script>
+</body>
+</html>

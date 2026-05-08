@@ -71,6 +71,15 @@ def archivo_demasiado_grande(e):
     }), 413
 
 
+@app.route("/api/salto/analizar", methods=["POST"])
+def analizar_salto():
+    """Alias histórico para compatibilidad con clientes/tests que usan '/api/salto/analizar'.
+    Reutiliza la implementación `calcular_salto` que se encuentra más abajo.
+    """
+    # Import local para evitar ciclo de importación en tiempo de import
+    return calcular_salto()
+
+
 @app.route("/api/salto/calcular", methods=["POST"])
 def calcular_salto():
     """
@@ -104,21 +113,18 @@ def calcular_salto():
     if tipo_salto not in ("vertical", "horizontal"):
         return jsonify({"error": "tipo_salto debe ser 'vertical' o 'horizontal'"}), 400
 
-    # Validar altura real (obligatoria para ambos tipos)
+    # Validar altura real (opcional: si se proporciona, debe ser número positivo)
     altura_real_m = None
     altura_str = request.form.get("altura_real_m")
-    if not altura_str:
-        return jsonify({
-            "error": "'altura_real_m' es obligatorio (ej. 1.75)"
-        }), 400
-    try:
-        altura_real_m = float(altura_str)
-        if altura_real_m <= 0:
-            raise ValueError
-    except ValueError:
-        return jsonify({
-            "error": "'altura_real_m' debe ser un número positivo (ej. 1.75)"
-        }), 400
+    if altura_str:
+        try:
+            altura_real_m = float(altura_str)
+            if altura_real_m <= 0:
+                raise ValueError
+        except ValueError:
+            return jsonify({
+                "error": "'altura_real_m' debe ser un número positivo (ej. 1.75)"
+            }), 400
 
     # Guardar archivo temporal con nombre único
     nombre_archivo = f"{uuid.uuid4().hex}{ext}"

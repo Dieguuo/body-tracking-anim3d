@@ -1,21 +1,56 @@
 // getBackendBaseUrl() se carga desde js/config.js
 // fetchJson() se carga desde js/api-client.js
+//
+// Esta pantalla pertenece al modulo SALTO y consume su propia API
+// (`/api/usuarios` en el backend de salto, puerto 5001). Como la BD
+// `bd_anim3d` esta unificada, los usuarios creados aqui son los mismos
+// que vera el modulo de futbol.
+
+function _baseUsuarios() {
+    return `${getBackendBaseUrl()}/api/usuarios`;
+}
+
+async function obtenerUsuariosPaginados({ search = '', limit = 20, offset = 0 } = {}) {
+    const query = new URLSearchParams({
+        paginado: '1',
+        search,
+        limit: String(limit),
+        offset: String(offset),
+    });
+    const payload = await fetchJson(`${_baseUsuarios()}?${query.toString()}`);
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    return {
+        items,
+        total: Number(payload.total || 0),
+        limit: Number(payload.limit || limit),
+        offset: Number(payload.offset || offset),
+        has_more: Boolean(payload.has_more),
+    };
+}
 
 function setUsuarioActivo(usuario) {
+    const nombreCompleto = usuario.nombre_completo || usuario.nombre || '';
+    const altura = (usuario.altura_m !== undefined && usuario.altura_m !== null && String(usuario.altura_m).trim() !== '')
+        ? Number(usuario.altura_m)
+        : null;
+    const peso = (usuario.peso_kg !== undefined && usuario.peso_kg !== null && String(usuario.peso_kg).trim() !== '')
+        ? Number(usuario.peso_kg)
+        : null;
+
     sessionStorage.setItem('idUser', String(usuario.id_usuario));
-    sessionStorage.setItem('aliasUser', usuario.alias);
-    sessionStorage.setItem('nombreUser', usuario.nombre_completo);
-    sessionStorage.setItem('alturaUser', String(usuario.altura_m));
-    sessionStorage.setItem('pesoUser', usuario.peso_kg != null ? String(usuario.peso_kg) : '');
+    sessionStorage.setItem('aliasUser', usuario.alias || '');
+    sessionStorage.setItem('nombreUser', nombreCompleto);
+    sessionStorage.setItem('alturaUser', altura != null ? String(altura) : '');
+    sessionStorage.setItem('pesoUser', peso != null ? String(peso) : '');
 
     const alturaInput = document.getElementById('altura-usuario');
     if (alturaInput) {
-        alturaInput.value = usuario.altura_m;
+        alturaInput.value = altura != null ? String(altura) : '';
     }
 
     const estado = document.getElementById('usuario-estado');
     if (estado) {
-        estado.textContent = `Usuario activo: ${usuario.alias} (ID ${usuario.id_usuario})`;
+        estado.textContent = `Usuario activo: ${usuario.alias || '-'} (ID ${usuario.id_usuario})`;
         estado.style.color = '#34c759';
     }
 
@@ -47,90 +82,42 @@ function limpiarUsuarioActivo(mensaje = 'Sin usuario activo.') {
     }));
 }
 
-async function crearUsuario(alias, nombreCompleto, alturaM, pesoKg) {
-    const url = `${getBackendBaseUrl()}/api/usuarios`;
-    const body = {
-        alias: alias,
-        nombre_completo: nombreCompleto,
-        altura_m: alturaM
-    };
-    if (pesoKg != null && pesoKg !== '') body.peso_kg = pesoKg;
-    const payload = await fetchJson(url, {
+async function crearUsuario(data) {
+    const payload = await fetchJson(_baseUsuarios(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(data)
     });
 
-    return payload.id_usuario;
+    const idUsuario = Number(payload.id_usuario);
+    if (!Number.isFinite(idUsuario) || idUsuario <= 0) {
+        throw new Error('El backend no devolvio un id_usuario valido');
+    }
+    return idUsuario;
 }
 
-async function actualizarUsuario(idUsuario, alias, nombreCompleto, alturaM, pesoKg) {
-    const url = `${getBackendBaseUrl()}/api/usuarios/${idUsuario}`;
-    const body = {
-        alias: alias,
-        nombre_completo: nombreCompleto,
-        altura_m: alturaM
-    };
-    if (pesoKg != null && pesoKg !== '') body.peso_kg = pesoKg;
-    await fetchJson(url, {
+async function actualizarUsuario(id, data) {
+    return await fetchJson(`${_baseUsuarios()}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(data)
     });
 }
 
-async function eliminarUsuario(idUsuario) {
-    const url = `${getBackendBaseUrl()}/api/usuarios/${idUsuario}`;
-    await fetchJson(url, { method: 'DELETE' });
+async function eliminarUsuario(id) {
+    return await fetchJson(`${_baseUsuarios()}/${id}`, {
+        method: 'DELETE'
+    });
 }
 
-async function obtenerUsuarios() {
-    const url = `${getBackendBaseUrl()}/api/usuarios`;
-    return await fetchJson(url);
-}
-
-async function obtenerUsuariosPaginados({ search = '', limit = 20, offset = 0 }) {
-    const query = new URLSearchParams({
-        paginado: '1',
+async function fetchUsuarios(paginado = true, search = '', limit = 20, offset = 0) {
+    const params = new URLSearchParams({
+        paginado: paginado ? '1' : '0',
         search,
         limit: String(limit),
         offset: String(offset)
     });
-    const url = `${getBackendBaseUrl()}/api/usuarios?${query.toString()}`;
-    const payload = await fetchJson(url);
-
-    if (Array.isArray(payload)) {
-        const items = payload
-            .sort((a, b) => String(a.alias || '').localeCompare(String(b.alias || '')))
-            .filter((u) => {
-                if (!search) return true;
-                const txt = `${u.alias || ''} ${u.nombre_completo || ''} ${u.altura_m || ''}`.toLowerCase();
-                return txt.includes(search.toLowerCase());
-            })
-            .slice(offset, offset + limit);
-
-        const filtradosTotal = payload.filter((u) => {
-            if (!search) return true;
-            const txt = `${u.alias || ''} ${u.nombre_completo || ''} ${u.altura_m || ''}`.toLowerCase();
-            return txt.includes(search.toLowerCase());
-        }).length;
-
-        return {
-            items,
-            total: filtradosTotal,
-            limit,
-            offset,
-            has_more: (offset + items.length) < filtradosTotal,
-        };
-    }
-
-    return {
-        items: Array.isArray(payload.items) ? payload.items : [],
-        total: Number(payload.total || 0),
-        limit: Number(payload.limit || limit),
-        offset: Number(payload.offset || offset),
-        has_more: Boolean(payload.has_more),
-    };
+    return await fetchJson(`${_baseUsuarios()}?${params.toString()}`);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -166,7 +153,13 @@ document.addEventListener('DOMContentLoaded', () => {
             mensajeEstado.textContent = '';
 
             try {
-                const idUsuario = await crearUsuario(alias, nombreCompleto, alturaM, pesoKg);
+                const idUsuario = await crearUsuario({
+                    alias: alias,
+                    nombre_completo: nombreCompleto,
+                    altura_m: alturaM,
+                    peso_kg: pesoKg,
+                });
+
                 setUsuarioActivo({
                     id_usuario: idUsuario,
                     alias: alias,
@@ -251,11 +244,8 @@ document.addEventListener('DOMContentLoaded', () => {
         limpiarFormularioUsuario();
     }
 
-    function obtenerEdadTexto(u) {
-        if (u.edad !== undefined && u.edad !== null && String(u.edad).trim() !== '') {
-            return String(u.edad);
-        }
-        if (u.altura_m !== undefined && u.altura_m !== null) {
+    function obtenerAlturaTexto(u) {
+        if (u.altura_m !== undefined && u.altura_m !== null && String(u.altura_m).trim() !== '') {
             return `${u.altura_m} m`;
         }
         return '-';
@@ -270,24 +260,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (Number(u.id_usuario) === usuarioActivoId) {
             tr.classList.add('activo');
             usuarioActivoData = u;
-            setUsuarioActivo({
-                id_usuario: u.id_usuario,
-                alias: u.alias,
-                nombre_completo: u.nombre_completo,
-                altura_m: Number(u.altura_m),
-                peso_kg: u.peso_kg != null ? Number(u.peso_kg) : null,
-            });
         }
 
         const tdAlias = document.createElement('td');
         tdAlias.textContent = u.alias || '';
         const tdNombre = document.createElement('td');
         tdNombre.textContent = u.nombre_completo || '';
-        const tdEdad = document.createElement('td');
-        tdEdad.textContent = obtenerEdadTexto(u);
+        const tdAltura = document.createElement('td');
+        tdAltura.textContent = obtenerAlturaTexto(u);
         const tdPeso = document.createElement('td');
         tdPeso.textContent = u.peso_kg != null ? `${u.peso_kg} kg` : '-';
-        tr.append(tdAlias, tdNombre, tdEdad, tdPeso);
+        tr.append(tdAlias, tdNombre, tdAltura, tdPeso);
 
         tr.addEventListener('click', () => {
             usuarioActivoId = Number(u.id_usuario);
@@ -297,9 +280,9 @@ document.addEventListener('DOMContentLoaded', () => {
             setUsuarioActivo({
                 id_usuario: u.id_usuario,
                 alias: u.alias,
-                nombre_completo: u.nombre_completo,
-                altura_m: Number(u.altura_m),
-                peso_kg: u.peso_kg != null ? Number(u.peso_kg) : null,
+                nombre_completo: u.nombre_completo || '',
+                altura_m: (u.altura_m !== undefined && u.altura_m !== null && String(u.altura_m).trim() !== '') ? Number(u.altura_m) : null,
+                peso_kg: (u.peso_kg !== undefined && u.peso_kg !== null && String(u.peso_kg).trim() !== '') ? Number(u.peso_kg) : null,
             });
         });
 
@@ -322,6 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (reset) {
             usuariosOffset = 0;
             usuariosHasMore = true;
+            usuarioActivoData = null;
             tablaBody.innerHTML = '';
         }
 
@@ -338,6 +322,19 @@ document.addEventListener('DOMContentLoaded', () => {
             data.items.forEach((u) => pintarFilaUsuario(u));
             usuariosOffset += data.items.length;
             usuariosHasMore = Boolean(data.has_more);
+
+            // Si es la carga inicial y el usuario activo estaba en la lista,
+            // restaurar su estado en UI una sola vez (sin llamarlo por cada fila).
+            if (reset && usuarioActivoData) {
+                const u = usuarioActivoData;
+                setUsuarioActivo({
+                    id_usuario: u.id_usuario,
+                    alias: u.alias,
+                    nombre_completo: u.nombre_completo || u.nombre || '',
+                    altura_m: u.altura_m,
+                    peso_kg: u.peso_kg,
+                });
+            }
         } catch (error) {
             setEstado(`No se pudo cargar usuarios: ${error.message}`, '#ff6b6b');
         } finally {
@@ -470,10 +467,20 @@ document.addEventListener('DOMContentLoaded', () => {
             btnCrearInline.textContent = modoEdicion ? 'Guardando...' : 'Creando...';
             try {
                 if (modoEdicion && usuarioActivoData) {
-                    await actualizarUsuario(usuarioActivoData.id_usuario, alias, nombre, altura, peso);
+                    await actualizarUsuario(usuarioActivoData.id_usuario, {
+                        alias: alias,
+                        nombre_completo: nombre,
+                        altura_m: altura,
+                        peso_kg: peso,
+                    });
                     usuarioActivoId = usuarioActivoData.id_usuario;
                 } else {
-                    const idUsuario = await crearUsuario(alias, nombre, altura, peso);
+                    const idUsuario = await crearUsuario({
+                        alias: alias,
+                        nombre_completo: nombre,
+                        altura_m: altura,
+                        peso_kg: peso,
+                    });
                     usuarioActivoId = idUsuario;
                 }
 

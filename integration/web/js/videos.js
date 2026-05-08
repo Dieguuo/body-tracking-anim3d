@@ -78,7 +78,8 @@ function crearCardVideo(video) {
     videoEl.className = 'video-player';
     videoEl.controls = true;
     videoEl.preload = 'metadata';
-    videoEl.src = `${getBackendBaseUrl()}/api/videos/${video.id_salto}/stream`;
+    // Usa data-src para lazy loading: el video solo se cargará cuando sea visible.
+    videoEl.setAttribute('data-src', `${getBackendBaseUrl()}/api/videos/${video.id_salto}/stream`);
 
     const controles = crearControlesVideo(videoEl);
 
@@ -125,6 +126,9 @@ function renderComparativas(comparativas) {
         card.append(titulo, meta, videosWrap);
         container.appendChild(card);
     });
+
+    // Inicia lazy loading para todos los videos: cargarán cuando sean visibles en pantalla.
+    LazyLoadHelper.observeElements('video.video-player', 'data-src');
 }
 
 function renderIndividuales(individuales) {
@@ -145,97 +149,85 @@ function renderIndividuales(individuales) {
     individuales.forEach((video) => {
         container.appendChild(crearCardVideo(video));
     });
+
+    // Inicia lazy loading para todos los videos: cargarán cuando sean visibles en pantalla.
+    LazyLoadHelper.observeElements('video.video-player', 'data-src');
 }
 
+// Utiliza GalleryHelper para evitar duplicación entre módulos.
 async function cargarUsuarios() {
-    const select = document.getElementById('filtro-usuario');
-    if (!select) {
-        return;
-    }
-
-    select.innerHTML = '';
-
-    const optionTodos = document.createElement('option');
-    optionTodos.value = '';
-    optionTodos.textContent = 'Todos los usuarios';
-    select.appendChild(optionTodos);
-
-    const payload = await fetchJson(`${getBackendBaseUrl()}/api/usuarios`);
-    const usuarios = Array.isArray(payload) ? payload : (payload.items || []);
-
-    usuarios
-        .sort((a, b) => String(a.alias || '').localeCompare(String(b.alias || '')))
-        .forEach((u) => {
-            const opt = document.createElement('option');
-            opt.value = String(u.id_usuario);
-            opt.textContent = `${u.alias} (ID ${u.id_usuario})`;
-            select.appendChild(opt);
-        });
+    return GalleryHelper.fetchAndPopulateUsers({
+        url: `${getBackendBaseUrl()}/api/usuarios`,
+        selectId: 'filtro-usuario',
+        isPaginated: false,
+        transformItem: (u) => ({ value: String(u.id_usuario), text: `${u.alias || u.nombre || 'Usuario'} (ID ${u.id_usuario})` }),
+        fetchFn: fetchJson,
+    });
 }
 
 async function cargarBiblioteca() {
-    const estado = document.getElementById('videos-estado');
     const usuario = document.getElementById('filtro-usuario')?.value || '';
     const tipo = document.getElementById('filtro-tipo')?.value || '';
 
-    if (estado) {
-        estado.textContent = 'Cargando biblioteca...';
-    }
+    GalleryHelper.setEstado('videos-estado', 'Cargando biblioteca...');
 
     const params = new URLSearchParams();
     if (usuario) params.set('id_usuario', usuario);
     if (tipo) params.set('tipo', tipo);
 
-    const url = `${getBackendBaseUrl()}/api/videos${params.toString() ? `?${params.toString()}` : ''}`;
-    const payload = await fetchJson(url);
+    const url = `${getBackendBaseUrl()}/api/videos`;
+    // Intenta obtener del caché primero para evitar latencia innecesaria.
+    const cacheKey = `${url}|usuario=${usuario}|tipo=${tipo}`;
+    const cached = CacheManager.get(cacheKey, { usuario, tipo });
+    if (cached) {
+        renderComparativas(cached.comparativas || []);
+        renderIndividuales(cached.individuales || []);
+        const total = Number(cached.totales?.videos || 0);
+        GalleryHelper.setEstado('videos-estado', `${total} vídeos encontrados (caché).`);
+        return;
+    }
+
+    // Si no está en caché, fetch desde backend.
+    const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
+    const payload = await fetchJson(fullUrl);
+
+    // Guarda en caché para evitar refetch dentro de 5 minutos.
+    CacheManager.set(cacheKey, payload, { usuario, tipo });
 
     renderComparativas(payload.comparativas || []);
     renderIndividuales(payload.individuales || []);
 
-    if (estado) {
-        const total = Number(payload.totales?.videos || 0);
-        estado.textContent = `${total} vídeos encontrados.`;
-    }
+    const total = Number(payload.totales?.videos || 0);
+    GalleryHelper.setEstado('videos-estado', `${total} vídeos encontrados.`);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
     const estado = document.getElementById('videos-estado');
     const btnRefrescar = document.getElementById('btn-refrescar-videos');
 
+    // Crea versión debouncida de cargarBiblioteca para evitar múltiples llamadas rápidas.
+    // Espera 300ms después del último cambio antes de ejecutar.
+    const cargarBibliotecaDebouncida = GalleryHelper.debounce(
+        () => cargarBiblioteca().catch((error) => GalleryHelper.setEstado('videos-estado', `Error: ${error.message}`, true)),
+        300
+    );
+
     try {
         await cargarUsuarios();
         await cargarBiblioteca();
     } catch (error) {
-        if (estado) {
-            estado.textContent = `Error: ${error.message}`;
-            estado.style.color = '#ff6b6b';
-        }
+        GalleryHelper.setEstado('videos-estado', `Error: ${error.message}`, true);
     }
 
-    document.getElementById('filtro-usuario')?.addEventListener('change', () => {
-        cargarBiblioteca().catch((error) => {
-            if (estado) {
-                estado.textContent = `Error: ${error.message}`;
-                estado.style.color = '#ff6b6b';
-            }
-        });
-    });
+    // Listener con debounce: evita llamadas múltiples mientras el usuario sigue seleccionando.
+    document.getElementById('filtro-usuario')?.addEventListener('change', cargarBibliotecaDebouncida);
 
-    document.getElementById('filtro-tipo')?.addEventListener('change', () => {
-        cargarBiblioteca().catch((error) => {
-            if (estado) {
-                estado.textContent = `Error: ${error.message}`;
-                estado.style.color = '#ff6b6b';
-            }
-        });
-    });
+    // Listener con debounce: igual para el filtro de tipo.
+    document.getElementById('filtro-tipo')?.addEventListener('change', cargarBibliotecaDebouncida);
 
+    // Botón de actualizar manual sin debounce: usuario puede forzar recarga.
     btnRefrescar?.addEventListener('click', () => {
-        cargarBiblioteca().catch((error) => {
-            if (estado) {
-                estado.textContent = `Error: ${error.message}`;
-                estado.style.color = '#ff6b6b';
-            }
-        });
+        CacheManager.clear();
+        cargarBiblioteca().catch((error) => GalleryHelper.setEstado('videos-estado', `Error: ${error.message}`, true));
     });
 });

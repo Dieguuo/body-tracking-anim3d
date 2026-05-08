@@ -2,6 +2,20 @@
 
 Script de arranque para todo el proyecto.
 
+> 🗄️ **Base de datos unificada**: ver [`README_BBDD_UNIFICADA.md`](README_BBDD_UNIFICADA.md)
+> para el esquema compartido `bd_anim3d`, scripts SQL (`init_db_unificada.sql`,
+> `migrate_to_unified.sql`, `migrate_features_version.sql`) y procedimiento de
+> migración / rollback.
+
+### Scripts SQL
+
+| Script | Propósito |
+|--------|-----------|
+| `init_db.sql` | Esquema legacy (sólo módulo salto, conservado por compatibilidad) |
+| `init_db_unificada.sql` | Esquema unificado `bd_anim3d` (salto + futbol) |
+| `migrate_to_unified.sql` | Migración desde `bd_anim3d_saltos` legacy → `bd_anim3d` |
+| `migrate_features_version.sql` | Añade `gestos_futbol.features_version` a una BD existente (idempotente) |
+
 ## Arranque completo
 
 | Script | Plataforma | Qué hace |

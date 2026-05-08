@@ -14,6 +14,17 @@
             width: 100%;
             margin-top: 1.5rem;
         }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.9rem;
+            width: 100%;
+        }
+        @media (max-width: 520px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
         .form-title {
             color: var(--text-light);
             font-size: 1.8rem;
@@ -26,7 +37,7 @@
         }
     </style>
 </head>
-<body class="sensor-page"> <header class="top-bar">
+<body class="sensor-page registro-page"> <header class="top-bar">
         <a href="index.html" class="back-button"><span class="arrow">←</span> Volver</a>
     </header>
 
@@ -35,9 +46,10 @@
             <p class="form-subtitle">Introduce los datos para el análisis físico</p>
 
             <form id="registro-form" class="form-container">
-                <input type="text" id="alias" name="alias" class="modern-input" placeholder="Alias (Ej: Juan99)" required maxlength="50">
-                
-                <input type="text" id="nombre_completo" name="nombre_completo" class="modern-input" placeholder="Nombre completo" required maxlength="100">
+                <div class="form-row">
+                    <input type="text" id="alias" name="alias" class="modern-input" placeholder="Alias (Ej: Juan99)" required maxlength="50">
+                    <input type="text" id="nombre_completo" name="nombre_completo" class="modern-input" placeholder="Nombre completo" required maxlength="100">
+                </div>
                 
                 <input type="number" id="altura_m" name="altura_m" class="modern-input" placeholder="Altura en metros (Ej: 1.75)" required step="0.01" min="0.50" max="2.50">
 
